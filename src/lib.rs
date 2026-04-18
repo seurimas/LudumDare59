@@ -3,6 +3,7 @@ use bevy_asset_loader::prelude::*;
 
 pub mod acceptance;
 pub mod audio_params;
+pub mod dictionary;
 pub mod futhark;
 pub mod loading;
 
