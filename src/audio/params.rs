@@ -48,11 +48,8 @@ pub struct SoundParams {
     pub echo_decay: f32,
     /// If true, shorter samples play as-is (no echo) and longer samples still fade at cut. Default false.
     pub conversational: bool,
-    /// Array of reverb presets to choose from at random. Empty means no reverb.
-    pub reverb: Vec<ReverbParams>,
-    /// Resolved reverb chosen by pick_params. Not deserialized from JSON.
-    #[serde(skip)]
-    pub selected_reverb: Option<ReverbParams>,
+    /// Reverb settings. Omit for dry playback.
+    pub reverb: Option<ReverbParams>,
 }
 
 impl Default for SoundParams {
@@ -66,8 +63,7 @@ impl Default for SoundParams {
             pitch_scale: 1.0,
             echo_decay: 0.5,
             conversational: false,
-            reverb: Vec::new(),
-            selected_reverb: None,
+            reverb: None,
         }
     }
 }

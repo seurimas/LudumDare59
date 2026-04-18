@@ -116,23 +116,7 @@ fn params_to_bake_for_index(
         Some(v) => v.clone(),
     };
 
-    let mut out = Vec::new();
-    for variant in base_variants {
-        if variant.reverb.is_empty() {
-            let mut resolved = variant;
-            resolved.selected_reverb = None;
-            out.push(resolved);
-            continue;
-        }
-
-        for reverb in &variant.reverb {
-            let mut resolved = variant.clone();
-            resolved.selected_reverb = Some(reverb.clone());
-            out.push(resolved);
-        }
-    }
-
-    out
+    base_variants
 }
 
 pub fn play_futhark_key_sound(

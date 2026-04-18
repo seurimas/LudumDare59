@@ -73,7 +73,7 @@ pub fn process_audio(bytes: &Arc<[u8]>, params: &SoundParams) -> ProcessedAudio 
     }
 
     // Reverb
-    if let Some(reverb) = &params.selected_reverb {
+    if let Some(reverb) = &params.reverb {
         apply_reverb(&mut samples, reverb, sample_rate, channels);
         normalize_peak(&mut samples, 0.9);
     }
