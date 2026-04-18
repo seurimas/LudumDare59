@@ -1,6 +1,8 @@
 use std::fmt;
 
 use crate::futhark;
+use rand::Rng;
+use rand::seq::IteratorRandom;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Pronunciation {
@@ -63,6 +65,19 @@ pub fn load_default_pronunciations() -> Result<Vec<Pronunciation>, String> {
     parse_pronunciations(include_str!("../assets/en_US.txt"))
 }
 
+pub fn load_default_futharkations() -> Result<Vec<Futharkation>, String> {
+    let pronunciations = load_default_pronunciations()?;
+    collect_futharkations(&pronunciations)
+}
+
+pub fn random_futharkation_with_rune_length<R: Rng + ?Sized>(
+    rune_length: usize,
+    rng: &mut R,
+) -> Result<Futharkation, String> {
+    let pronunciations = load_default_pronunciations()?;
+    random_futharkation_with_rune_length_from_pronunciations(&pronunciations, rune_length, rng)
+}
+
 pub fn parse_pronunciations(source: &str) -> Result<Vec<Pronunciation>, String> {
     let mut items = Vec::new();
 
@@ -103,6 +118,32 @@ fn parse_pronunciation_line(line: &str) -> Result<Pronunciation, String> {
     Ok(Pronunciation {
         word: word.to_string(),
         ipa: ipa.to_string(),
+    })
+}
+
+fn collect_futharkations(pronunciations: &[Pronunciation]) -> Result<Vec<Futharkation>, String> {
+    pronunciations
+        .iter()
+        .map(|pronunciation| {
+            pronunciation
+                .to_futharkation()
+                .map_err(|missing| missing.to_string())
+        })
+        .collect()
+}
+
+fn random_futharkation_with_rune_length_from_pronunciations<R: Rng + ?Sized>(
+    pronunciations: &[Pronunciation],
+    rune_length: usize,
+    rng: &mut R,
+) -> Result<Futharkation, String> {
+    let matches: Vec<Futharkation> = collect_futharkations(pronunciations)?
+        .into_iter()
+        .filter(|futharkation| futharkation.letters.chars().count() == rune_length)
+        .collect();
+
+    matches.into_iter().choose(rng).ok_or_else(|| {
+        format!("no futharkation found with rune length {rune_length} in the default dictionary")
     })
 }
 
@@ -164,6 +205,8 @@ fn naive_ipa_to_futhark(symbol: char) -> Option<char> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::SeedableRng;
+    use rand::rngs::StdRng;
 
     #[test]
     fn parses_a_dictionary_line() {
@@ -201,5 +244,31 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn random_futharkation_filters_by_rune_length() {
+        let pronunciations = vec![
+            Pronunciation {
+                word: "short".to_string(),
+                ipa: "fu".to_string(),
+            },
+            Pronunciation {
+                word: "exact".to_string(),
+                ipa: "futar".to_string(),
+            },
+            Pronunciation {
+                word: "other".to_string(),
+                ipa: "fut".to_string(),
+            },
+        ];
+        let mut rng = StdRng::seed_from_u64(7);
+
+        let selected =
+            random_futharkation_with_rune_length_from_pronunciations(&pronunciations, 5, &mut rng)
+                .expect("a five-rune entry");
+
+        assert_eq!(selected.word, "exact");
+        assert_eq!(selected.letters.chars().count(), 5);
     }
 }

@@ -1,4 +1,4 @@
-use LudumDare59::{configure_app, configure_loading};
+use LudumDare59::{configure_app, configure_loading, rune_words::battle::configure_battle};
 use bevy::prelude::*;
 
 #[cfg(test)]
@@ -10,6 +10,7 @@ fn main() {
     let mut app = App::new();
     app.add_plugins(DefaultPlugins);
     configure_app(&mut app);
+    configure_battle(&mut app);
     configure_loading(&mut app);
     app.run();
 }

@@ -35,3 +35,7 @@ path = "tests/acceptance/shows_rune_slots.rs"
 [[bin]]
 name = "uat_shows_rune_word_navigation"
 path = "tests/acceptance/shows_rune_word_navigation.rs"
+
+[[bin]]
+name = "uat_shows_battle_rune_word"
+path = "tests/acceptance/shows_battle_rune_word.rs"
