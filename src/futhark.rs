@@ -39,7 +39,7 @@ pub struct FutharkKeyRuneVisual;
 pub struct FutharkKeyLetterVisual;
 
 const SPRITE_KEYBOARD_BG: usize = 254;
-const SPRITE_RUNE_OFFSET: usize = 24;
+pub const SPRITE_RUNE_OFFSET: usize = 24;
 
 #[derive(Resource, Default, Clone, Copy, PartialEq, Eq)]
 pub enum FutharkKeyboardLegendMode {
@@ -80,58 +80,27 @@ pub fn configure_futhark_keyboard(app: &mut App) {
     app.add_message::<TypedFutharkInput>();
 }
 
-pub fn bake_futhark_key_sounds(
-    game_assets: Res<GameAssets>,
-    audio_sources: Res<Assets<AudioSource>>,
-    sound_configs: Res<Assets<crate::audio::FutharkSoundConfig>>,
-    mut processed_audios: ResMut<Assets<crate::audio::ProcessedAudio>>,
-    mut commands: Commands,
-) {
-    let config = sound_configs.get(&game_assets.futhark_sound_params);
-    let handles_by_index =
-        bake_futhark_sounds_for_config(config, &game_assets, &audio_sources, &mut processed_audios);
-
-    commands.insert_resource(PrebakedFutharkAudio { handles_by_index });
-}
-
-pub fn bake_futhark_conversational_sounds(
-    game_assets: Res<GameAssets>,
-    audio_sources: Res<Assets<AudioSource>>,
-    sound_configs: Res<Assets<crate::audio::FutharkSoundConfig>>,
-    mut processed_audios: ResMut<Assets<crate::audio::ProcessedAudio>>,
-    mut commands: Commands,
-) {
-    let config = sound_configs.get(&game_assets.futhark_conversational_params);
-    let handles_by_index =
-        bake_futhark_sounds_for_config(config, &game_assets, &audio_sources, &mut processed_audios);
-
-    commands.insert_resource(PrebakedFutharkConversationalAudio { handles_by_index });
-}
-
-fn bake_futhark_sounds_for_config(
-    config: Option<&crate::audio::FutharkSoundConfig>,
+pub fn bake_futhark_letter(
+    letter_index: usize,
     game_assets: &GameAssets,
     audio_sources: &Assets<AudioSource>,
+    config: Option<&crate::audio::FutharkSoundConfig>,
     processed_audios: &mut Assets<crate::audio::ProcessedAudio>,
-) -> Vec<Vec<Handle<crate::audio::ProcessedAudio>>> {
-    let mut handles_by_index = vec![Vec::new(); LETTERS.len()];
+) -> Vec<Handle<crate::audio::ProcessedAudio>> {
+    let Some(raw) = game_assets.futhark_sounds.get(letter_index) else {
+        return Vec::new();
+    };
+    let Some(source) = audio_sources.get(&raw.clone().typed::<AudioSource>()) else {
+        return Vec::new();
+    };
 
-    for index in 0..LETTERS.len() {
-        let Some(raw) = game_assets.futhark_sounds.get(index) else {
-            continue;
-        };
-        let Some(source) = audio_sources.get(&raw.clone().typed::<AudioSource>()) else {
-            continue;
-        };
-
-        let params_for_index = params_to_bake_for_index(config, index);
-        for params in params_for_index {
+    params_to_bake_for_index(config, letter_index)
+        .into_iter()
+        .map(|params| {
             let processed = crate::audio::process_audio(&source.bytes, &params);
-            handles_by_index[index].push(processed_audios.add(processed));
-        }
-    }
-
-    handles_by_index
+            processed_audios.add(processed)
+        })
+        .collect()
 }
 
 fn params_to_bake_for_index(

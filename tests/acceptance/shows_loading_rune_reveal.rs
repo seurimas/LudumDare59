@@ -14,14 +14,14 @@ fn main() {
     acceptance::initialize_app(
         &mut app,
         AcceptanceTest::from(TEST_ID).with_grid(),
-        "After loading, reveals 5 runes one-by-one before ready",
+        "Processes audio one rune per frame with fade-in animation, then enters Ready",
     );
     app.run();
 }
 
 fn spawn_ready_confirmation(mut commands: Commands) {
     commands.spawn((
-        Text::new("Rune reveal complete — press F1 to pass, F2 to fail"),
+        Text::new("Processing complete — press F1 to pass, F2 to fail"),
         TextFont {
             font_size: 24.0,
             ..default()

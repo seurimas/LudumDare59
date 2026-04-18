@@ -12,7 +12,7 @@ pub mod rune_words;
 pub enum GameState {
     #[default]
     Loading,
-    RuneReveal,
+    Processing,
     Ready,
 }
 
@@ -80,13 +80,6 @@ pub fn configure_app(app: &mut App) {
         )
             .chain()
             .run_if(in_state(GameState::Ready)),
-    )
-    .add_systems(
-        OnEnter(GameState::Ready),
-        (
-            futhark::bake_futhark_key_sounds,
-            futhark::bake_futhark_conversational_sounds,
-        ),
     );
 }
 
