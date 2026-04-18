@@ -21,3 +21,7 @@ git commit -m "<A meaningful commit message>"
 ```
 
 Then, report on the results to the user.
+
+## Important bevy 0.18 things
+
+Old bevy had `add_startup_system`. Now, you `add_system(Startup, <system>)`.

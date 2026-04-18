@@ -1,7 +1,9 @@
-use std::time::Duration;
-
 use bevy::prelude::*;
+
+#[cfg(test)]
 use bevy::time::TimeUpdateStrategy;
+#[cfg(test)]
+use std::time::Duration;
 
 #[cfg(test)]
 mod snapshot;
@@ -14,7 +16,17 @@ fn main() {
 }
 
 fn configure_app(app: &mut App) {
-    let _ = app;
+    let _ = app
+        // Set the clear color to blue
+        .insert_resource(ClearColor(Color::linear_rgb(0.0, 0.0, 1.0)))
+        // Spawn a red square in the center of the screen
+        .add_systems(Startup, |mut commands: Commands| {
+            commands.spawn(Sprite {
+                color: Color::linear_rgb(1.0, 0.0, 0.0),
+                custom_size: Some(Vec2::new(100.0, 100.0)),
+                ..default()
+            });
+        });
 }
 
 #[cfg(test)]
@@ -55,22 +67,17 @@ mod tests {
     #[test]
     fn snapshot_default_window() {
         use bevy::winit::WinitPlugin;
+        use std::path::PathBuf;
 
         let mut app = App::new();
-        app.add_plugins(
-            DefaultPlugins
-                .set(WindowPlugin {
-                    primary_window: Some(Window {
-                        visible: false,
-                        ..default()
-                    }),
-                    ..default()
-                })
-                .set(WinitPlugin {
-                    run_on_any_thread: true,
-                }),
-        );
+        app.add_plugins(DefaultPlugins.build().disable::<WinitPlugin>());
         configure_app(&mut app);
+
+        let last_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests")
+            .join("snapshots")
+            .join("default_window_last.png");
+        let _ = std::fs::remove_file(&last_path);
 
         app.add_systems(Update, |mut commands: Commands, mut done: Local<bool>| {
             if !*done {
@@ -82,8 +89,17 @@ mod tests {
         app.finish();
         app.cleanup();
 
-        for _ in 0..10 {
+        for _ in 0..40 {
             app.update();
+            if last_path.exists() {
+                break;
+            }
         }
+
+        assert!(
+            last_path.exists(),
+            "Expected snapshot output at {:?}",
+            last_path
+        );
     }
 }

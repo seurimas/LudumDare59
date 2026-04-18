@@ -1,5 +1,8 @@
 use bevy::{
-    prelude::{Commands, On},
+    asset::RenderAssetUsages,
+    camera::RenderTarget,
+    prelude::{Camera2d, Commands, Image, On},
+    render::render_resource::{Extent3d, TextureDimension, TextureFormat, TextureUsages},
     render::view::screenshot::{Screenshot, ScreenshotCaptured},
 };
 use std::path::PathBuf;
@@ -18,15 +21,37 @@ fn snapshot_last_path(name: &str) -> PathBuf {
         .join(format!("{name}_last.png"))
 }
 
-/// Spawns a screenshot of the primary window and attaches the snapshot observer.
+/// Spawns an off-screen camera, captures one frame, and attaches the snapshot observer.
 ///
 /// When the `update` feature is set, saves the captured image as the new baseline.
 /// Otherwise, compares against the saved baseline and panics if they differ or none exists.
 /// The captured image is always written to `tests/snapshots/<name>_last.png`.
 pub fn take(commands: &mut Commands, name: &'static str) {
-    commands
-        .spawn(Screenshot::primary_window())
-        .observe(snapshot_observer(name));
+    commands.queue(move |world: &mut bevy::prelude::World| {
+        let mut images = world.resource_mut::<bevy::prelude::Assets<Image>>();
+        let size = Extent3d {
+            width: 320,
+            height: 180,
+            depth_or_array_layers: 1,
+        };
+
+        let mut render_target = Image::new_fill(
+            size,
+            TextureDimension::D2,
+            &[0, 0, 0, 255],
+            TextureFormat::Rgba8UnormSrgb,
+            RenderAssetUsages::default(),
+        );
+        render_target.texture_descriptor.usage |= TextureUsages::RENDER_ATTACHMENT;
+        let handle = images.add(render_target);
+        drop(images);
+
+        world.spawn((Camera2d, RenderTarget::Image(handle.clone().into())));
+
+        world
+            .spawn(Screenshot::image(handle))
+            .observe(snapshot_observer(name));
+    });
 }
 
 fn snapshot_observer(
