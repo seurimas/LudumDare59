@@ -31,7 +31,7 @@ After completing ANY work, always run `cargo test`. Additionally, identify any n
 Verify that your changes have not introduced new problems. When that is complete, go ahead and do all of the following:
 
 ```
-cargo fmt ; cargo build
+cargo fmt ; cargo build LudumDare59
 git add .
 git commit -m "<A meaningful commit message>"
 ```

@@ -169,7 +169,7 @@ fn naive_ipa_to_futhark(symbol: char) -> Option<char> {
         'ð' => Some('d'),
         's' => Some('s'),
         'z' => Some('z'),
-        'ʃ' => Some('s'),
+        'ʃ' => Some('7'),
         'ʒ' => Some('z'),
         'h' => Some('h'),
         'm' => Some('m'),
