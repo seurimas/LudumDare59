@@ -69,6 +69,11 @@ pub struct PrebakedFutharkAudio {
     pub handles_by_index: Vec<Vec<Handle<crate::audio::ProcessedAudio>>>,
 }
 
+#[derive(Resource, Default)]
+pub struct PrebakedFutharkConversationalAudio {
+    pub handles_by_index: Vec<Vec<Handle<crate::audio::ProcessedAudio>>>,
+}
+
 pub fn configure_futhark_keyboard(app: &mut App) {
     app.init_resource::<FutharkKeyboardLegendMode>();
     app.init_resource::<FutharkKeyboardAnimationSpeed>();
@@ -83,6 +88,32 @@ pub fn bake_futhark_key_sounds(
     mut commands: Commands,
 ) {
     let config = sound_configs.get(&game_assets.futhark_sound_params);
+    let handles_by_index =
+        bake_futhark_sounds_for_config(config, &game_assets, &audio_sources, &mut processed_audios);
+
+    commands.insert_resource(PrebakedFutharkAudio { handles_by_index });
+}
+
+pub fn bake_futhark_conversational_sounds(
+    game_assets: Res<GameAssets>,
+    audio_sources: Res<Assets<AudioSource>>,
+    sound_configs: Res<Assets<crate::audio::FutharkSoundConfig>>,
+    mut processed_audios: ResMut<Assets<crate::audio::ProcessedAudio>>,
+    mut commands: Commands,
+) {
+    let config = sound_configs.get(&game_assets.futhark_conversational_params);
+    let handles_by_index =
+        bake_futhark_sounds_for_config(config, &game_assets, &audio_sources, &mut processed_audios);
+
+    commands.insert_resource(PrebakedFutharkConversationalAudio { handles_by_index });
+}
+
+fn bake_futhark_sounds_for_config(
+    config: Option<&crate::audio::FutharkSoundConfig>,
+    game_assets: &GameAssets,
+    audio_sources: &Assets<AudioSource>,
+    processed_audios: &mut Assets<crate::audio::ProcessedAudio>,
+) -> Vec<Vec<Handle<crate::audio::ProcessedAudio>>> {
     let mut handles_by_index = vec![Vec::new(); LETTERS.len()];
 
     for index in 0..LETTERS.len() {
@@ -100,7 +131,7 @@ pub fn bake_futhark_key_sounds(
         }
     }
 
-    commands.insert_resource(PrebakedFutharkAudio { handles_by_index });
+    handles_by_index
 }
 
 fn params_to_bake_for_index(

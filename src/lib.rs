@@ -6,7 +6,7 @@ pub mod audio;
 pub mod dictionary;
 pub mod futhark;
 pub mod loading;
-pub mod rune_slots;
+pub mod rune_words;
 
 #[derive(States, Default, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum GameState {
@@ -59,7 +59,7 @@ pub struct GameAssets {
 pub fn configure_app(app: &mut App) {
     app.insert_resource(ClearColor(Color::linear_rgb(0.0, 0.0, 1.0)));
     futhark::configure_futhark_keyboard(app);
-    rune_slots::configure_rune_slots(app);
+    rune_words::rune_slots::configure_rune_slots(app);
 
     app.add_systems(
         Update,
@@ -71,15 +71,23 @@ pub fn configure_app(app: &mut App) {
             futhark::sync_futhark_key_hover,
             futhark::animate_futhark_keyboard_colors,
             futhark::play_futhark_key_sound,
-            rune_slots::activate_rune_slot_on_click,
-            rune_slots::update_active_rune_slot_from_typed_input,
-            rune_slots::handle_backspace_in_rune_slots,
-            rune_slots::sync_rune_slot_visuals,
+            rune_words::rune_slots::activate_rune_slot_on_click,
+            rune_words::rune_slots::update_active_rune_slot_from_typed_input,
+            rune_words::rune_slots::handle_backspace_in_rune_slots,
+            rune_words::rune_slots::emit_play_active_rune_word_audio_on_enter,
+            rune_words::rune_slots::play_active_rune_word_audio,
+            rune_words::rune_slots::sync_rune_slot_visuals,
         )
             .chain()
             .run_if(in_state(GameState::Ready)),
     )
-    .add_systems(OnEnter(GameState::Ready), futhark::bake_futhark_key_sounds);
+    .add_systems(
+        OnEnter(GameState::Ready),
+        (
+            futhark::bake_futhark_key_sounds,
+            futhark::bake_futhark_conversational_sounds,
+        ),
+    );
 }
 
 pub fn configure_loading(app: &mut App) {

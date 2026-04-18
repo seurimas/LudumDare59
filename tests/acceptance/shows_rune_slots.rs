@@ -1,7 +1,7 @@
 use LudumDare59::{
     GameAssets, GameState, acceptance, configure_app, configure_loading,
     futhark::{FutharkKeyboardAnimationSpeed, spawn_futhark_keyboard},
-    rune_slots::{RuneSlotConfig, RuneSlotForegroundSet, spawn_rune_slot},
+    rune_words::rune_slots::{RuneSlotConfig, RuneSlotForegroundSet, spawn_rune_slot},
 };
 use bevy::prelude::*;
 

@@ -1,7 +1,10 @@
 use bevy::ecs::message::MessageReader;
+use bevy::ecs::message::MessageWriter;
 use bevy::input::ButtonState;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::prelude::*;
+use std::collections::HashSet;
+use std::sync::Arc;
 
 use crate::{GameAssets, futhark};
 
@@ -62,6 +65,9 @@ pub struct ActiveRuneSlot {
     pub entity: Option<Entity>,
 }
 
+#[derive(Message, Default)]
+pub struct PlayActiveRuneWordAudio;
+
 pub struct RuneSlotConfig {
     pub left: Val,
     pub top: Val,
@@ -86,6 +92,7 @@ impl Default for RuneSlotConfig {
 
 pub fn configure_rune_slots(app: &mut App) {
     app.init_resource::<ActiveRuneSlot>();
+    app.add_message::<PlayActiveRuneWordAudio>();
 }
 
 pub fn spawn_rune_slot(
@@ -260,6 +267,135 @@ pub fn handle_backspace_in_rune_slots(
     }
 }
 
+pub fn emit_play_active_rune_word_audio_on_enter(
+    mut keyboard_input: MessageReader<KeyboardInput>,
+    mut play_events: MessageWriter<PlayActiveRuneWordAudio>,
+) {
+    let enter_pressed = keyboard_input
+        .read()
+        .any(|ev| ev.state == ButtonState::Pressed && ev.key_code == KeyCode::Enter);
+
+    if enter_pressed {
+        play_events.write_default();
+    }
+}
+
+pub fn play_active_rune_word_audio(
+    mut play_events: MessageReader<PlayActiveRuneWordAudio>,
+    active_slot: Res<ActiveRuneSlot>,
+    slots: Query<(&RuneSlot, Option<&RuneSlotLinks>)>,
+    prebaked_audio: Option<Res<crate::futhark::PrebakedFutharkConversationalAudio>>,
+    mut processed_audio_assets: ResMut<Assets<crate::audio::ProcessedAudio>>,
+    mut commands: Commands,
+) {
+    if play_events.is_empty() {
+        return;
+    }
+
+    play_events.clear();
+
+    let Some(prebaked_audio) = prebaked_audio else {
+        return;
+    };
+
+    let Some(active_entity) = active_slot.entity else {
+        return;
+    };
+
+    let rune_indices = collect_word_rune_indices(active_entity, &slots);
+    if rune_indices.is_empty() {
+        return;
+    }
+
+    let mut combined_samples = Vec::new();
+    let mut channels = 0;
+    let mut sample_rate = 0;
+
+    for rune_index in rune_indices {
+        let Some(handle) = prebaked_audio
+            .handles_by_index
+            .get(rune_index)
+            .and_then(|handles| handles.first())
+        else {
+            continue;
+        };
+
+        let Some(processed) = processed_audio_assets.get(handle) else {
+            continue;
+        };
+
+        if channels == 0 {
+            channels = processed.channels;
+            sample_rate = processed.sample_rate;
+        }
+
+        if processed.channels != channels || processed.sample_rate != sample_rate {
+            continue;
+        }
+
+        combined_samples.extend_from_slice(&processed.samples);
+    }
+
+    if combined_samples.is_empty() {
+        return;
+    }
+
+    let concatenated_handle = processed_audio_assets.add(crate::audio::ProcessedAudio {
+        samples: Arc::<[f32]>::from(combined_samples),
+        channels,
+        sample_rate,
+    });
+
+    commands.spawn(AudioPlayer::<crate::audio::ProcessedAudio>(
+        concatenated_handle,
+    ));
+}
+
+fn collect_word_rune_indices(
+    active_entity: Entity,
+    slots: &Query<(&RuneSlot, Option<&RuneSlotLinks>)>,
+) -> Vec<usize> {
+    let mut first = active_entity;
+    let mut seen = HashSet::new();
+
+    loop {
+        if !seen.insert(first) {
+            break;
+        }
+
+        let Ok((_, links)) = slots.get(first) else {
+            return Vec::new();
+        };
+
+        let Some(prev) = links.and_then(|l| l.prev) else {
+            break;
+        };
+        first = prev;
+    }
+
+    let mut indices = Vec::new();
+    let mut current = Some(first);
+    let mut forward_seen = HashSet::new();
+
+    while let Some(entity) = current {
+        if !forward_seen.insert(entity) {
+            break;
+        }
+
+        let Ok((slot, links)) = slots.get(entity) else {
+            break;
+        };
+
+        if let Some(index) = slot.rune_index {
+            indices.push(index);
+        }
+
+        current = links.and_then(|l| l.next);
+    }
+
+    indices
+}
+
 pub fn sync_rune_slot_visuals(
     active_slot: Res<ActiveRuneSlot>,
     slots: Query<(Entity, &RuneSlot, &Children)>,
@@ -359,6 +495,7 @@ mod tests {
                 activate_rune_slot_on_click,
                 update_active_rune_slot_from_typed_input,
                 handle_backspace_in_rune_slots,
+                emit_play_active_rune_word_audio_on_enter,
             )
                 .chain(),
         );
@@ -635,5 +772,30 @@ mod tests {
             .unwrap()
             .rune_index;
         assert_eq!(rune_a, None, "slot_a should be cleared");
+    }
+
+    #[test]
+    fn enter_emits_play_active_rune_word_audio_message() {
+        let mut app = make_test_app();
+
+        app.world_mut().write_message(KeyboardInput {
+            key_code: KeyCode::Enter,
+            logical_key: bevy::input::keyboard::Key::Enter,
+            state: ButtonState::Pressed,
+            window: Entity::PLACEHOLDER,
+            repeat: false,
+            text: None,
+        });
+
+        app.update();
+
+        let reader = app
+            .world_mut()
+            .resource_mut::<Messages<PlayActiveRuneWordAudio>>();
+        let mut cursor = reader.get_cursor();
+        assert!(
+            cursor.read(&reader).next().is_some(),
+            "expected a play message after Enter"
+        );
     }
 }

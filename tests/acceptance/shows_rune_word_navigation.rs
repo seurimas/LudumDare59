@@ -1,7 +1,9 @@
 use LudumDare59::{
     GameAssets, GameState, acceptance, configure_app, configure_loading,
     futhark::{FutharkKeyboardAnimationSpeed, spawn_futhark_keyboard},
-    rune_slots::{ActiveRuneSlot, RuneSlotConfig, RuneSlotForegroundSet, spawn_rune_word},
+    rune_words::rune_slots::{
+        ActiveRuneSlot, RuneSlotConfig, RuneSlotForegroundSet, spawn_rune_word,
+    },
 };
 use bevy::prelude::*;
 
@@ -19,7 +21,7 @@ fn main() {
     acceptance::initialize_app(
         &mut app,
         TEST_ID.into(),
-        "Type futhark letters to fill the word slots left-to-right. Backspace clears the previous slot.",
+        "Type futhark letters to fill the word slots left-to-right. Backspace clears the previous slot. Press Enter to play the word using conversational rune samples.",
     );
 
     app.run();
@@ -76,7 +78,9 @@ fn spawn_word_demo(
             top: Val::Px(110.0),
             ..default()
         },
-        Text::new("Type futhark letters to fill the word. Backspace clears the previous slot."),
+        Text::new(
+            "Type futhark letters to fill the word. Backspace clears the previous slot. Press Enter to play it.",
+        ),
         TextFont {
             font_size: 18.0,
             ..default()
