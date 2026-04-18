@@ -269,7 +269,7 @@ fn on_acting_row_resolved(
     active_slot.entity = row.first().copied();
 }
 
-fn find_best_match(
+pub(crate) fn find_best_match(
     guess: &[Option<char>],
     targets: &[dictionary::Futharkation],
 ) -> Option<(dictionary::Futharkation, Vec<RuneMatchState>)> {
@@ -289,4 +289,239 @@ fn find_best_match(
         })
         .max_by_key(|(_, _, correct, present)| (*correct, *present))
         .map(|(target, results, _, _)| (target, results))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::futhark;
+    use crate::rune_words::battle::{ACTIVE_ROW_TOP, ROW_RISE, configure_battle};
+    use crate::rune_words::rune_slots::{RuneSlot, configure_rune_slots};
+    use bevy::time::TimeUpdateStrategy;
+    use std::time::Duration;
+
+    fn make_test_app() -> App {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        configure_rune_slots(&mut app);
+        configure_battle(&mut app);
+        app.insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_millis(
+            100,
+        )));
+        app.insert_resource(crate::GameAssets {
+            futhark: Handle::default(),
+            futhark_layout: Handle::default(),
+            futhark_sounds: Vec::new(),
+            futhark_sound_params: Handle::default(),
+            futhark_conversational_params: Handle::default(),
+        });
+        app
+    }
+
+    fn fill_active_row(app: &mut App, guess: &str) {
+        let slots = app
+            .world()
+            .resource::<BattleState>()
+            .active_row_slots
+            .clone();
+        for (entity, letter) in slots.into_iter().zip(guess.chars()) {
+            app.world_mut()
+                .entity_mut(entity)
+                .get_mut::<RuneSlot>()
+                .expect("slot")
+                .rune_index = futhark::letter_to_index(letter);
+        }
+    }
+
+    fn futha(word: &str, letters: &str) -> dictionary::Futharkation {
+        dictionary::Futharkation {
+            word: word.to_string(),
+            letters: letters.to_string(),
+        }
+    }
+
+    // --- unit tests for find_best_match ---
+
+    #[test]
+    fn find_best_match_returns_none_for_empty_targets() {
+        let guess: Vec<Option<char>> = vec![Some('f'), Some('u')];
+        assert!(find_best_match(&guess, &[]).is_none());
+    }
+
+    #[test]
+    fn find_best_match_picks_target_with_most_correct() {
+        let guess: Vec<Option<char>> = vec![Some('f'), Some('u'), Some('t')];
+        let targets = vec![futha("a", "fxx"), futha("b", "fut")];
+        let (matched, results) = find_best_match(&guess, &targets).unwrap();
+        assert_eq!(matched.word, "b");
+        assert!(results.iter().all(|r| matches!(r, RuneMatchState::Correct)));
+    }
+
+    #[test]
+    fn find_best_match_breaks_ties_by_present_count() {
+        // "fax" vs "fut": guess "fut" → "fax" gives 1 correct (f) + 0 present,
+        // "fut" gives 3 correct. Let's test present tiebreaker instead:
+        // guess "fab", targets "fax" (2 correct: f,a) vs "fbx" (1 correct: f, 1 present: b)
+        let guess: Vec<Option<char>> = vec![Some('f'), Some('a'), Some('b')];
+        let targets = vec![futha("fax", "fax"), futha("fbx", "fbx")];
+        let (matched, _) = find_best_match(&guess, &targets).unwrap();
+        assert_eq!(matched.word, "fax");
+    }
+
+    #[test]
+    fn find_best_match_prefers_correct_over_present() {
+        // guess "abc", target1 "abc" (3 correct), target2 "bca" (0 correct, 3 present)
+        let guess: Vec<Option<char>> = vec![Some('a'), Some('b'), Some('c')];
+        let targets = vec![futha("bca", "bca"), futha("abc", "abc")];
+        let (matched, _) = find_best_match(&guess, &targets).unwrap();
+        assert_eq!(matched.word, "abc");
+    }
+
+    // --- app tests ---
+
+    #[test]
+    fn start_acting_spawns_slots_for_longest_target() {
+        let mut app = make_test_app();
+        app.world_mut().write_message(StartActing {
+            targets: vec![
+                futha("aa", "fu"),
+                futha("bbbbb", "futar"),
+                futha("ccc", "fut"),
+            ],
+        });
+        app.update();
+        let state = app.world().resource::<BattleState>();
+        assert_eq!(
+            state.active_row_slots.len(),
+            5,
+            "slots = longest target length"
+        );
+        assert_eq!(state.phase, BattlePhase::Acting);
+    }
+
+    #[test]
+    fn start_acting_ignores_empty_targets() {
+        let mut app = make_test_app();
+        app.world_mut()
+            .write_message(StartActing { targets: vec![] });
+        app.update();
+        let state = app.world().resource::<BattleState>();
+        assert_eq!(
+            state.phase,
+            BattlePhase::Idle,
+            "empty targets should not start acting"
+        );
+    }
+
+    #[test]
+    fn acting_two_correct_marks_pending_success() {
+        let mut app = make_test_app();
+        app.world_mut().write_message(StartActing {
+            targets: vec![futha("fable", "futar")],
+        });
+        app.update();
+
+        fill_active_row(&mut app, "futxx");
+        app.world_mut().write_message(EnterActiveRuneWord);
+        app.update();
+
+        let acting_data = app.world().resource::<ActingData>();
+        assert!(
+            acting_data.pending_success,
+            "3 correct runes should set pending_success"
+        );
+    }
+
+    #[test]
+    fn acting_fewer_than_two_correct_does_not_set_pending_success() {
+        let mut app = make_test_app();
+        app.world_mut().write_message(StartActing {
+            targets: vec![futha("fable", "futar")],
+        });
+        app.update();
+
+        // only 1 correct ('f')
+        fill_active_row(&mut app, "fxxxx");
+        app.world_mut().write_message(EnterActiveRuneWord);
+        app.update();
+
+        let acting_data = app.world().resource::<ActingData>();
+        assert!(!acting_data.pending_success);
+    }
+
+    #[test]
+    fn acting_success_sends_succeeded_and_transitions_to_idle() {
+        let mut app = make_test_app();
+        app.world_mut().write_message(StartActing {
+            targets: vec![futha("fable", "futar")],
+        });
+        app.update();
+
+        fill_active_row(&mut app, "futxx");
+        app.world_mut().write_message(EnterActiveRuneWord);
+        app.update();
+
+        // advance past animation
+        for _ in 0..10 {
+            app.update();
+        }
+
+        let state = app.world().resource::<BattleState>();
+        assert_eq!(
+            state.phase,
+            BattlePhase::Idle,
+            "phase should return to Idle after success"
+        );
+    }
+
+    #[test]
+    fn acting_failure_spawns_new_row_and_stays_acting() {
+        let mut app = make_test_app();
+        app.world_mut().write_message(StartActing {
+            targets: vec![futha("fable", "futar")],
+        });
+        app.update();
+
+        // only 1 correct → failure
+        fill_active_row(&mut app, "fxxxx");
+        app.world_mut().write_message(EnterActiveRuneWord);
+        app.update();
+
+        for _ in 0..10 {
+            app.update();
+        }
+
+        let state = app.world().resource::<BattleState>();
+        assert_eq!(
+            state.phase,
+            BattlePhase::Acting,
+            "phase should stay Acting after failure"
+        );
+        assert_eq!(state.active_row_slots.len(), 5, "new row should be spawned");
+    }
+
+    #[test]
+    fn acting_failure_pushes_previous_row_up() {
+        let mut app = make_test_app();
+        app.world_mut().write_message(StartActing {
+            targets: vec![futha("fable", "futar")],
+        });
+        app.update();
+
+        let first_row = app
+            .world()
+            .resource::<BattleState>()
+            .active_row_slots
+            .clone();
+
+        fill_active_row(&mut app, "fxxxx");
+        app.world_mut().write_message(EnterActiveRuneWord);
+        app.update();
+        for _ in 0..10 {
+            app.update();
+        }
+
+        let top = app.world().entity(first_row[0]).get::<Node>().unwrap().top;
+        assert_eq!(top, Val::Px(ACTIVE_ROW_TOP - ROW_RISE));
+    }
 }

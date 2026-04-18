@@ -261,3 +261,206 @@ fn on_reacting_row_resolved(
     battle_state.active_row_slots = row.clone();
     active_slot.entity = row.first().copied();
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::futhark;
+    use crate::rune_words::battle::{ACTIVE_ROW_TOP, ROW_RISE, configure_battle};
+    use crate::rune_words::rune_slots::{EnterActiveRuneWord, RuneSlot, configure_rune_slots};
+    use bevy::time::TimeUpdateStrategy;
+    use std::time::Duration;
+
+    fn make_test_app() -> App {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        configure_rune_slots(&mut app);
+        configure_battle(&mut app);
+        app.insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_millis(
+            100,
+        )));
+        app.insert_resource(crate::GameAssets {
+            futhark: Handle::default(),
+            futhark_layout: Handle::default(),
+            futhark_sounds: Vec::new(),
+            futhark_sound_params: Handle::default(),
+            futhark_conversational_params: Handle::default(),
+        });
+        app
+    }
+
+    fn futha(word: &str, letters: &str) -> dictionary::Futharkation {
+        dictionary::Futharkation {
+            word: word.to_string(),
+            letters: letters.to_string(),
+        }
+    }
+
+    fn fill_active_row(app: &mut App, guess: &str) {
+        let slots = app
+            .world()
+            .resource::<BattleState>()
+            .active_row_slots
+            .clone();
+        for (entity, letter) in slots.into_iter().zip(guess.chars()) {
+            app.world_mut()
+                .entity_mut(entity)
+                .get_mut::<RuneSlot>()
+                .expect("slot")
+                .rune_index = futhark::letter_to_index(letter);
+        }
+    }
+
+    #[test]
+    fn start_reacting_sets_phase_and_spawns_slots() {
+        let mut app = make_test_app();
+        app.world_mut().write_message(StartReacting {
+            target: futha("fable", "fut"),
+            time_limit: 10.0,
+        });
+        app.update();
+
+        let state = app.world().resource::<BattleState>();
+        assert_eq!(state.phase, BattlePhase::Reacting);
+        assert_eq!(
+            state.active_row_slots.len(),
+            3,
+            "one slot per rune in target"
+        );
+
+        let data = app.world().resource::<ReactingData>();
+        assert!(data.active);
+        assert_eq!(data.time_limit, 10.0);
+        assert_eq!(data.elapsed, 0.0);
+    }
+
+    #[test]
+    fn reacting_timer_advances_each_frame() {
+        let mut app = make_test_app();
+        app.world_mut().write_message(StartReacting {
+            target: futha("fable", "fut"),
+            time_limit: 10.0,
+        });
+        app.update();
+        app.update(); // one 100ms tick
+
+        let data = app.world().resource::<ReactingData>();
+        assert!(data.elapsed > 0.0, "elapsed should increase after a frame");
+    }
+
+    #[test]
+    fn reacting_timeout_sends_failed_and_transitions_to_idle() {
+        let mut app = make_test_app();
+        // 100ms time step × 5 updates = 500ms; set limit to 0.3s so it expires
+        app.world_mut().write_message(StartReacting {
+            target: futha("fa", "fu"),
+            time_limit: 0.3,
+        });
+        app.update();
+
+        // Run enough frames to exceed the 0.3s limit (each frame = 100ms)
+        for _ in 0..5 {
+            app.update();
+        }
+
+        let state = app.world().resource::<BattleState>();
+        assert_eq!(
+            state.phase,
+            BattlePhase::Idle,
+            "phase should be Idle after timeout"
+        );
+
+        let data = app.world().resource::<ReactingData>();
+        assert!(!data.active, "timer should be inactive after timeout");
+    }
+
+    #[test]
+    fn reacting_correct_guess_sends_succeeded_and_transitions_to_idle() {
+        let mut app = make_test_app();
+        app.world_mut().write_message(StartReacting {
+            target: futha("fable", "fut"),
+            time_limit: 10.0,
+        });
+        app.update();
+
+        fill_active_row(&mut app, "fut");
+        app.world_mut().write_message(EnterActiveRuneWord);
+        app.update();
+
+        // Let animation complete
+        for _ in 0..10 {
+            app.update();
+        }
+
+        let state = app.world().resource::<BattleState>();
+        assert_eq!(
+            state.phase,
+            BattlePhase::Idle,
+            "phase should be Idle after correct guess"
+        );
+
+        let data = app.world().resource::<ReactingData>();
+        assert!(!data.active, "should be inactive after success");
+    }
+
+    #[test]
+    fn reacting_wrong_guess_stays_active_and_spawns_new_row() {
+        let mut app = make_test_app();
+        app.world_mut().write_message(StartReacting {
+            target: futha("fable", "fut"),
+            time_limit: 10.0,
+        });
+        app.update();
+
+        let first_row = app
+            .world()
+            .resource::<BattleState>()
+            .active_row_slots
+            .clone();
+
+        fill_active_row(&mut app, "fxx");
+        app.world_mut().write_message(EnterActiveRuneWord);
+        app.update();
+        for _ in 0..10 {
+            app.update();
+        }
+
+        let state = app.world().resource::<BattleState>();
+        assert_eq!(
+            state.phase,
+            BattlePhase::Reacting,
+            "should remain Reacting after wrong guess"
+        );
+        assert_eq!(state.active_row_slots.len(), 3, "new row should be spawned");
+        assert_ne!(
+            state.active_row_slots, first_row,
+            "new row entities should differ from first row"
+        );
+    }
+
+    #[test]
+    fn reacting_wrong_guess_pushes_previous_row_up() {
+        let mut app = make_test_app();
+        app.world_mut().write_message(StartReacting {
+            target: futha("fable", "fut"),
+            time_limit: 10.0,
+        });
+        app.update();
+
+        let first_row = app
+            .world()
+            .resource::<BattleState>()
+            .active_row_slots
+            .clone();
+
+        fill_active_row(&mut app, "fxx");
+        app.world_mut().write_message(EnterActiveRuneWord);
+        app.update();
+        for _ in 0..10 {
+            app.update();
+        }
+
+        let top = app.world().entity(first_row[0]).get::<Node>().unwrap().top;
+        assert_eq!(top, Val::Px(ACTIVE_ROW_TOP - ROW_RISE));
+    }
+}
