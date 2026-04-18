@@ -1,9 +1,8 @@
 use std::io::Cursor;
 use std::sync::Arc;
 
+use pitch_shift::{Shifter, TOTAL_F32};
 use rodio::Source;
-use rustfft::FftPlanner;
-use rustfft::num_complex::Complex32;
 
 use super::params::{ReverbParams, SoundParams};
 use super::playback::ProcessedAudio;
@@ -26,7 +25,8 @@ pub fn process_audio(bytes: &Arc<[u8]>, params: &SoundParams) -> ProcessedAudio 
 
     // Pitch scaling (phase-vocoder time-stretch + resample).
     if (params.pitch_scale - 1.0).abs() > f32::EPSILON {
-        samples = pitch_scale_interleaved(&samples, channels, params.pitch_scale);
+        samples = pitch_scale_interleaved(&samples, channels, sample_rate, params.pitch_scale);
+        normalize_peak(&mut samples, 0.9);
     }
 
     // Fade-in
@@ -75,6 +75,7 @@ pub fn process_audio(bytes: &Arc<[u8]>, params: &SoundParams) -> ProcessedAudio 
     // Reverb
     if let Some(reverb) = &params.selected_reverb {
         apply_reverb(&mut samples, reverb, sample_rate, channels);
+        normalize_peak(&mut samples, 0.9);
     }
 
     // Delay (silence before the sound)
@@ -96,7 +97,12 @@ fn ms_to_sample_count(ms: u64, sample_rate: u32, channels: u16) -> usize {
     (ms as f32 / 1000.0 * sample_rate as f32) as usize * channels as usize
 }
 
-fn pitch_scale_interleaved(samples: &[f32], channels: u16, pitch_scale: f32) -> Vec<f32> {
+fn pitch_scale_interleaved(
+    samples: &[f32],
+    channels: u16,
+    sample_rate: u32,
+    pitch_scale: f32,
+) -> Vec<f32> {
     if samples.is_empty() || channels == 0 || pitch_scale <= 0.0 {
         return samples.to_vec();
     }
@@ -111,7 +117,7 @@ fn pitch_scale_interleaved(samples: &[f32], channels: u16, pitch_scale: f32) -> 
         return samples.to_vec();
     }
 
-    let stretch = 1.0 / pitch_scale;
+    let semitones = 12.0 * pitch_scale.log2();
     let mut channels_out: Vec<Vec<f32>> = Vec::with_capacity(channel_count);
 
     for ch in 0..channel_count {
@@ -120,8 +126,7 @@ fn pitch_scale_interleaved(samples: &[f32], channels: u16, pitch_scale: f32) -> 
             mono.push(samples[i * channel_count + ch]);
         }
 
-        let stretched = phase_vocoder_time_stretch(&mono, stretch);
-        let shifted = resample_linear_to_len(&stretched, frame_count);
+        let shifted = shift_mono_streaming(&mono, semitones, sample_rate as f32);
         channels_out.push(shifted);
     }
 
@@ -137,133 +142,60 @@ fn pitch_scale_interleaved(samples: &[f32], channels: u16, pitch_scale: f32) -> 
     out
 }
 
-fn phase_vocoder_time_stretch(input: &[f32], stretch: f32) -> Vec<f32> {
+fn shift_mono_streaming(input: &[f32], semitones: f32, sample_rate: f32) -> Vec<f32> {
     if input.is_empty() {
         return Vec::new();
     }
 
-    if (stretch - 1.0).abs() < 1e-6 {
-        return input.to_vec();
+    const HOP: usize = 128;
+    const ALGO_DELAY: usize = 1024 - HOP;
+
+    let state_vec = vec![0.0f32; TOTAL_F32];
+    let state_box: Box<[f32; TOTAL_F32]> = state_vec
+        .into_boxed_slice()
+        .try_into()
+        .expect("state length matches TOTAL_F32");
+    let mut shifter = Shifter::new(state_box);
+    let mut shifted_stream = Vec::<f32>::with_capacity(input.len() + ALGO_DELAY + HOP * 8);
+
+    let mut i = 0usize;
+    while i < input.len() {
+        let mut chunk = [0.0f32; HOP];
+        let remaining = input.len() - i;
+        let take = remaining.min(HOP);
+        chunk[..take].copy_from_slice(&input[i..i + take]);
+        let out = shifter.shift(&chunk, semitones, sample_rate);
+        shifted_stream.extend_from_slice(out);
+        i += take;
     }
 
-    let window_size = 1024usize.min(input.len().max(64));
-    let window_size = if window_size % 2 == 0 {
-        window_size
-    } else {
-        window_size + 1
-    };
-    let analysis_hop = (window_size / 4).max(1);
-    let synthesis_hop = ((analysis_hop as f32 * stretch).round() as usize).max(1);
-
-    let window: Vec<f32> = (0..window_size)
-        .map(|n| {
-            0.5 - 0.5 * (2.0 * std::f32::consts::PI * n as f32 / (window_size as f32 - 1.0)).cos()
-        })
-        .collect();
-
-    let bin_omega: Vec<f32> = (0..window_size)
-        .map(|k| 2.0 * std::f32::consts::PI * k as f32 / window_size as f32)
-        .collect();
-
-    let mut planner = FftPlanner::<f32>::new();
-    let fft = planner.plan_fft_forward(window_size);
-    let ifft = planner.plan_fft_inverse(window_size);
-
-    let frame_count = ((input.len() + analysis_hop - 1) / analysis_hop).max(1);
-    let mut output = vec![0.0f32; (frame_count - 1) * synthesis_hop + window_size];
-    let mut norm = vec![0.0f32; output.len()];
-
-    let mut prev_phase = vec![0.0f32; window_size];
-    let mut sum_phase = vec![0.0f32; window_size];
-
-    let mut spectrum = vec![Complex32::new(0.0, 0.0); window_size];
-
-    for frame in 0..frame_count {
-        let in_pos = frame * analysis_hop;
-        for n in 0..window_size {
-            let sample = input.get(in_pos + n).copied().unwrap_or(0.0);
-            spectrum[n] = Complex32::new(sample * window[n], 0.0);
-        }
-
-        fft.process(&mut spectrum);
-
-        for k in 0..window_size {
-            let mag = spectrum[k].norm();
-            let phase = spectrum[k].arg();
-
-            let expected = bin_omega[k] * analysis_hop as f32;
-            let mut delta = phase - prev_phase[k] - expected;
-            delta = wrap_phase(delta);
-
-            let true_freq = bin_omega[k] + delta / analysis_hop as f32;
-            sum_phase[k] += true_freq * synthesis_hop as f32;
-
-            spectrum[k] = Complex32::from_polar(mag, sum_phase[k]);
-            prev_phase[k] = phase;
-        }
-
-        ifft.process(&mut spectrum);
-
-        let out_pos = frame * synthesis_hop;
-        for n in 0..window_size {
-            let sample = spectrum[n].re / window_size as f32;
-            let w = window[n];
-            output[out_pos + n] += sample * w;
-            norm[out_pos + n] += w * w;
-        }
+    // Flush tail so we can compensate the algorithmic delay cleanly.
+    let zeros = [0.0f32; HOP];
+    for _ in 0..10 {
+        let out = shifter.shift(&zeros, semitones, sample_rate);
+        shifted_stream.extend_from_slice(out);
     }
 
-    for i in 0..output.len() {
-        if norm[i] > 1e-8 {
-            output[i] /= norm[i];
-        }
+    if shifted_stream.len() <= ALGO_DELAY {
+        return vec![0.0; input.len()];
     }
 
-    let target_len = ((input.len() as f32 * stretch).round() as usize).max(1);
-    if output.len() > target_len {
-        output.truncate(target_len);
-    } else if output.len() < target_len {
-        output.resize(target_len, 0.0);
+    let available = &shifted_stream[ALGO_DELAY..];
+    let mut out = available[..available.len().min(input.len())].to_vec();
+    if out.len() < input.len() {
+        out.resize(input.len(), 0.0);
     }
-
-    output
-}
-
-fn wrap_phase(phase: f32) -> f32 {
-    let two_pi = 2.0 * std::f32::consts::PI;
-    phase - two_pi * (phase / two_pi).round()
-}
-
-fn resample_linear_to_len(input: &[f32], output_len: usize) -> Vec<f32> {
-    if output_len == 0 {
-        return Vec::new();
-    }
-
-    if input.is_empty() {
-        return vec![0.0; output_len];
-    }
-
-    if input.len() == 1 {
-        return vec![input[0]; output_len];
-    }
-
-    if output_len == 1 {
-        return vec![input[0]];
-    }
-
-    let max_in = (input.len() - 1) as f32;
-    let max_out = (output_len - 1) as f32;
-    let mut out = Vec::with_capacity(output_len);
-    for i in 0..output_len {
-        let pos = i as f32 * max_in / max_out;
-        let idx = pos.floor() as usize;
-        let frac = pos - idx as f32;
-        let a = input[idx];
-        let b = input[(idx + 1).min(input.len() - 1)];
-        out.push(a + frac * (b - a));
-    }
-
     out
+}
+
+fn normalize_peak(samples: &mut [f32], max_peak: f32) {
+    let peak = samples.iter().fold(0.0f32, |acc, &s| acc.max(s.abs()));
+    if peak > max_peak && peak > 1e-9 {
+        let gain = max_peak / peak;
+        for s in samples {
+            *s *= gain;
+        }
+    }
 }
 
 /// Apply a feedback comb-filter reverb in-place.
@@ -383,6 +315,23 @@ mod tests {
 
         assert!((f_left - 440.0).abs() < 25.0, "f_left={f_left}");
         assert!((f_right - 660.0).abs() < 35.0, "f_right={f_right}");
+    }
+
+    #[test]
+    fn pitch_scaling_keeps_peak_under_one() {
+        let sample_rate = 8_000u32;
+        let input = sine_wave(440.0, 1.0, sample_rate);
+        let wav = wav_bytes_mono_16(sample_rate, &input);
+
+        let params = SoundParams {
+            volume: 2.0,
+            pitch_scale: 0.5,
+            ..SoundParams::default()
+        };
+        let out = process_audio(&Arc::from(wav), &params);
+        let peak = out.samples.iter().fold(0.0f32, |acc, &s| acc.max(s.abs()));
+
+        assert!(peak <= 1.0, "peak={peak}");
     }
 
     fn sine_wave(freq_hz: f32, duration_s: f32, sample_rate: u32) -> Vec<f32> {
