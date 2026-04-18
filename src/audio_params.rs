@@ -268,14 +268,22 @@ pub fn process_audio(bytes: &Arc<[u8]>, params: &SoundParams) -> ProcessedAudio 
                 samples[i] *= 1.0 - t;
             }
         } else if !params.conversational {
-            // Shorter sample: echo (repeat at decaying volume) until duration is satisfied.
+            // Shorter sample: echo (repeat) until duration is satisfied.
             // Spillover beyond `target` on the last echo is allowed.
             let original = samples.clone();
-            let mut vol = params.echo_decay;
             while samples.len() < target {
-                let echo: Vec<f32> = original.iter().map(|&s| s * vol).collect();
-                samples.extend_from_slice(&echo);
-                vol *= params.echo_decay;
+                samples.extend_from_slice(&original);
+            }
+
+            // Apply a continuous exponential decay envelope across the entire buffer so
+            // volume trends strictly downward regardless of the sample's internal shape.
+            // After each repetition-length period, amplitude is multiplied by echo_decay once.
+            let period = original.len() as f32;
+            let decay_per_sample = params.echo_decay.powf(1.0 / period);
+            let mut env = 1.0f32;
+            for s in samples.iter_mut() {
+                *s *= env;
+                env *= decay_per_sample;
             }
         }
         // conversational + shorter than target: play as-is (no echo, no padding)
