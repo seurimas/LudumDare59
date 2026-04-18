@@ -44,8 +44,22 @@ const KEYBOARD_BOTTOM_ROW: [usize; 6] = [14, 24, 21, 17, 9, 19];
 pub struct FutharkKeyboard;
 
 #[derive(Component)]
+pub struct FutharkKeyboardButton;
+
+#[derive(Component)]
 pub struct FutharkKeyButton {
     pub index: usize,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FutharkKeyboardCommandType {
+    ToggleLegendMode,
+    Backspace,
+}
+
+#[derive(Component)]
+pub struct FutharkActionButton {
+    pub command: FutharkKeyboardCommandType,
 }
 
 #[derive(Component)]
@@ -54,7 +68,9 @@ pub struct FutharkKeyLabel {
 }
 
 #[derive(Component)]
-pub struct FutharkKeyBackground;
+pub struct FutharkKeyBackground {
+    pub base_color: Color,
+}
 
 #[derive(Component)]
 pub struct FutharkKeyRuneVisual;
@@ -88,6 +104,9 @@ impl Default for FutharkKeyboardAnimationSpeed {
 #[derive(Message)]
 pub struct TypedFutharkInput(pub char);
 
+#[derive(Message, Clone, Copy)]
+pub struct FutharkKeyboardCommand(pub FutharkKeyboardCommandType);
+
 #[derive(Resource, Default)]
 pub struct PrebakedFutharkAudio {
     pub handles_by_index: Vec<Vec<Handle<crate::audio::ProcessedAudio>>>,
@@ -102,6 +121,22 @@ pub fn configure_futhark_keyboard(app: &mut App) {
     app.init_resource::<FutharkKeyboardLegendMode>();
     app.init_resource::<FutharkKeyboardAnimationSpeed>();
     app.add_message::<TypedFutharkInput>();
+    app.add_message::<FutharkKeyboardCommand>();
+}
+
+fn is_vowel(letter: char) -> bool {
+    matches!(letter.to_ascii_lowercase(), 'a' | 'e' | 'i' | 'o' | 'u')
+}
+
+fn key_background_color(letter: char) -> Color {
+    let is_uppercase = letter.is_ascii_uppercase();
+
+    match (is_vowel(letter), is_uppercase) {
+        (true, true) => Color::srgb(0.55, 0.82, 0.55),
+        (true, false) => Color::srgb(0.96, 0.92, 0.50),
+        (false, true) => Color::srgb(0.55, 0.72, 0.96),
+        (false, false) => Color::WHITE,
+    }
 }
 
 pub fn bake_futhark_letter(
@@ -217,7 +252,58 @@ pub fn spawn_futhark_keyboard(mut commands: Commands, game_assets: Res<GameAsset
                         ..default()
                     })
                     .with_children(|row_parent| {
+                        if row_index == 0 {
+                            row_parent
+                                .spawn((
+                                    Button,
+                                    Node {
+                                        width: Val::Px(80.0),
+                                        height: Val::Px(48.0),
+                                        justify_content: JustifyContent::Center,
+                                        align_items: AlignItems::Center,
+                                        position_type: PositionType::Relative,
+                                        ..default()
+                                    },
+                                    BackgroundColor(Color::NONE),
+                                    FutharkKeyboardButton,
+                                    FutharkActionButton {
+                                        command: FutharkKeyboardCommandType::ToggleLegendMode,
+                                    },
+                                ))
+                                .with_children(|key_parent| {
+                                    key_parent.spawn((
+                                        Node {
+                                            position_type: PositionType::Absolute,
+                                            width: Val::Px(80.0),
+                                            height: Val::Px(48.0),
+                                            ..default()
+                                        },
+                                        ImageNode::from_atlas_image(
+                                            game_assets.futhark.clone(),
+                                            TextureAtlas {
+                                                layout: game_assets.futhark_layout.clone(),
+                                                index: SPRITE_KEYBOARD_BG,
+                                            },
+                                        ),
+                                        FutharkKeyBackground {
+                                            base_color: Color::srgb(0.85, 0.85, 0.85),
+                                        },
+                                    ));
+
+                                    key_parent.spawn((
+                                        Text::new("TAB"),
+                                        TextFont {
+                                            font_size: 20.0,
+                                            ..default()
+                                        },
+                                        TextColor(Color::BLACK),
+                                    ));
+                                });
+                        }
+
                         for &index in row {
+                            let letter = index_to_letter(index).expect("valid futhark index");
+
                             row_parent
                                 .spawn((
                                     Button,
@@ -230,6 +316,7 @@ pub fn spawn_futhark_keyboard(mut commands: Commands, game_assets: Res<GameAsset
                                         ..default()
                                     },
                                     BackgroundColor(Color::NONE),
+                                    FutharkKeyboardButton,
                                     FutharkKeyButton { index },
                                 ))
                                 .with_children(|key_parent| {
@@ -247,7 +334,9 @@ pub fn spawn_futhark_keyboard(mut commands: Commands, game_assets: Res<GameAsset
                                                 index: SPRITE_KEYBOARD_BG,
                                             },
                                         ),
-                                        FutharkKeyBackground,
+                                        FutharkKeyBackground {
+                                            base_color: key_background_color(letter),
+                                        },
                                     ));
 
                                     key_parent.spawn((
@@ -267,11 +356,7 @@ pub fn spawn_futhark_keyboard(mut commands: Commands, game_assets: Res<GameAsset
                                     ));
 
                                     key_parent.spawn((
-                                        Text::new(
-                                            index_to_letter(index)
-                                                .expect("valid futhark index")
-                                                .to_string(),
-                                        ),
+                                        Text::new(letter.to_string()),
                                         TextFont {
                                             font_size: 24.0,
                                             ..default()
@@ -286,9 +371,76 @@ pub fn spawn_futhark_keyboard(mut commands: Commands, game_assets: Res<GameAsset
                                     ));
                                 });
                         }
+
+                        if row_index == 0 {
+                            row_parent
+                                .spawn((
+                                    Button,
+                                    Node {
+                                        width: Val::Px(80.0),
+                                        height: Val::Px(48.0),
+                                        justify_content: JustifyContent::Center,
+                                        align_items: AlignItems::Center,
+                                        position_type: PositionType::Relative,
+                                        ..default()
+                                    },
+                                    BackgroundColor(Color::NONE),
+                                    FutharkKeyboardButton,
+                                    FutharkActionButton {
+                                        command: FutharkKeyboardCommandType::Backspace,
+                                    },
+                                ))
+                                .with_children(|key_parent| {
+                                    key_parent.spawn((
+                                        Node {
+                                            position_type: PositionType::Absolute,
+                                            width: Val::Px(80.0),
+                                            height: Val::Px(48.0),
+                                            ..default()
+                                        },
+                                        ImageNode::from_atlas_image(
+                                            game_assets.futhark.clone(),
+                                            TextureAtlas {
+                                                layout: game_assets.futhark_layout.clone(),
+                                                index: SPRITE_KEYBOARD_BG,
+                                            },
+                                        ),
+                                        FutharkKeyBackground {
+                                            base_color: Color::srgb(0.85, 0.85, 0.85),
+                                        },
+                                    ));
+
+                                    key_parent.spawn((
+                                        Text::new("BKSP"),
+                                        TextFont {
+                                            font_size: 16.0,
+                                            ..default()
+                                        },
+                                        TextColor(Color::BLACK),
+                                    ));
+                                });
+                        }
                     });
             }
         });
+}
+
+pub fn emit_futhark_keyboard_command_from_clicks(
+    buttons: Query<
+        (&Interaction, &FutharkActionButton),
+        (
+            Changed<Interaction>,
+            With<Button>,
+            With<FutharkKeyboardButton>,
+        ),
+    >,
+    mut commands: MessageWriter<FutharkKeyboardCommand>,
+) {
+    for (interaction, action) in &buttons {
+        if *interaction == Interaction::Pressed {
+            commands.write(FutharkKeyboardCommand(action.command));
+        }
+    }
 }
 
 pub fn emit_typed_futhark_input_from_keyboard(
@@ -324,15 +476,15 @@ pub fn emit_typed_futhark_input_from_keyboard_clicks(
 }
 
 pub fn sync_futhark_key_hover(
-    buttons: Query<(&Interaction, &Children), (Changed<Interaction>, With<FutharkKeyButton>)>,
-    mut backgrounds: Query<&mut ImageNode, With<FutharkKeyBackground>>,
+    buttons: Query<(&Interaction, &Children), (Changed<Interaction>, With<FutharkKeyboardButton>)>,
+    mut backgrounds: Query<(&mut ImageNode, &FutharkKeyBackground)>,
 ) {
     for (interaction, children) in &buttons {
         for child in children.iter() {
-            if let Ok(mut image) = backgrounds.get_mut(child) {
+            if let Ok((mut image, background)) = backgrounds.get_mut(child) {
                 image.color = match *interaction {
                     Interaction::Hovered | Interaction::Pressed => Color::srgb(0.6, 0.7, 1.0),
-                    Interaction::None => Color::WHITE,
+                    Interaction::None => background.base_color,
                 };
             }
         }
@@ -358,9 +510,15 @@ pub fn animate_futhark_keyboard_colors(
 
 pub fn toggle_futhark_keyboard_legend_mode(
     keyboard: Res<ButtonInput<KeyCode>>,
+    mut commands: MessageReader<FutharkKeyboardCommand>,
     mut mode: ResMut<FutharkKeyboardLegendMode>,
 ) {
-    if keyboard.just_pressed(KeyCode::Tab) {
+    let tab_pressed = keyboard.just_pressed(KeyCode::Tab)
+        || commands
+            .read()
+            .any(|command| command.0 == FutharkKeyboardCommandType::ToggleLegendMode);
+
+    if tab_pressed {
         *mode = match *mode {
             FutharkKeyboardLegendMode::Runes => FutharkKeyboardLegendMode::Letters,
             FutharkKeyboardLegendMode::Letters => FutharkKeyboardLegendMode::Runes,
@@ -444,5 +602,22 @@ mod tests {
 
         let expected_indices = (0..25).collect::<Vec<_>>();
         assert_eq!(all_indices, expected_indices);
+    }
+
+    #[test]
+    fn highlights_vowels_in_yellow() {
+        assert_eq!(key_background_color('a'), Color::srgb(0.96, 0.92, 0.50));
+        assert_eq!(key_background_color('u'), Color::srgb(0.96, 0.92, 0.50));
+    }
+
+    #[test]
+    fn highlights_uppercase_in_blue() {
+        assert_eq!(key_background_color('T'), Color::srgb(0.55, 0.72, 0.96));
+        assert_eq!(key_background_color('S'), Color::srgb(0.55, 0.72, 0.96));
+    }
+
+    #[test]
+    fn highlights_uppercase_vowels_in_green() {
+        assert_eq!(key_background_color('A'), Color::srgb(0.55, 0.82, 0.55));
     }
 }

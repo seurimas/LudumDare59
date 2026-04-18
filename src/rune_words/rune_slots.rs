@@ -240,12 +240,16 @@ pub fn update_active_rune_slot_from_typed_input(
 
 pub fn handle_backspace_in_rune_slots(
     mut keyboard_input: MessageReader<KeyboardInput>,
+    mut keyboard_commands: MessageReader<futhark::FutharkKeyboardCommand>,
     mut active_slot: ResMut<ActiveRuneSlot>,
     mut slots: Query<(&mut RuneSlot, Option<&RuneSlotLinks>)>,
 ) {
     let backspace_pressed = keyboard_input
         .read()
-        .any(|ev| ev.state == ButtonState::Pressed && ev.key_code == KeyCode::Backspace);
+        .any(|ev| ev.state == ButtonState::Pressed && ev.key_code == KeyCode::Backspace)
+        || keyboard_commands
+            .read()
+            .any(|command| command.0 == futhark::FutharkKeyboardCommandType::Backspace);
 
     if !backspace_pressed {
         return;

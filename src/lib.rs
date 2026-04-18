@@ -65,6 +65,7 @@ pub fn configure_app(app: &mut App) {
     app.add_systems(
         Update,
         (
+            futhark::emit_futhark_keyboard_command_from_clicks,
             futhark::toggle_futhark_keyboard_legend_mode,
             futhark::sync_futhark_keyboard_labels,
             futhark::emit_typed_futhark_input_from_keyboard,
