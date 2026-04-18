@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use bevy_asset_loader::prelude::*;
 
 pub mod acceptance;
+pub mod futhark;
 pub mod loading;
 
 #[derive(States, Default, Debug, Clone, PartialEq, Eq, Hash)]
