@@ -19,3 +19,7 @@ path = "tests/acceptance/shows_futhark_rune.rs"
 [[bin]]
 name = "uat_shows_loading_rune_reveal"
 path = "tests/acceptance/shows_loading_rune_reveal.rs"
+
+[[bin]]
+name = "uat_shows_typed_futhark_rune"
+path = "tests/acceptance/shows_typed_futhark_rune.rs"

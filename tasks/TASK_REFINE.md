@@ -2,6 +2,16 @@
 
 A refinement updates an existing feature or adds sub-features to it. It is not a bugfix.
 
+### Testing
+
+As part of the refinement, identify the points at which you can automate testing of that refinement, including:
+
+- unit tests: Architect the code such that small units of logic are easy to test, and then include unit tests for that.
+- app tests: Create a test which creates the whole app and verify some part of the feature works
+- user acceptance tests: Create a binary that launches the app in a specific state so the user can visually verify behavior. See below.
+
+Focus in particular on ways that the changes may introduce regressions.
+
 ### Before starting
 
 - Read the existing code for the feature being refined. Do not assume the current state matches earlier instructions.
