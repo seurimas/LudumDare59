@@ -1,11 +1,25 @@
-use LudumDare59::{GameAssets, GameState, acceptance, configure_app, configure_loading, futhark};
+use LudumDare59::{
+    GameAssets, GameState, acceptance, configure_app, configure_loading,
+    futhark::{self, FutharkKeyboardAnimationSpeed},
+};
 use bevy::ecs::message::MessageReader;
 use bevy::prelude::*;
 
 const TEST_ID: u8 = 4;
+const SPEED_MIN: f32 = 30.0;
+const SPEED_MAX: f32 = 60.0;
+const SPEED_STEP: f32 = 5.0;
 
 #[derive(Component)]
 struct TypedRuneDisplay;
+
+#[derive(Component)]
+struct SpeedLabel;
+
+#[derive(Component)]
+struct SpeedButton {
+    delta: f32,
+}
 
 fn main() {
     let mut app = App::new();
@@ -15,6 +29,7 @@ fn main() {
     futhark::configure_futhark_keyboard(&mut app);
     app.add_systems(OnEnter(GameState::Ready), spawn_typed_rune_display);
     app.add_systems(OnEnter(GameState::Ready), futhark::spawn_futhark_keyboard);
+    app.add_systems(OnEnter(GameState::Ready), spawn_speed_controls);
     app.add_systems(
         Update,
         (
@@ -22,7 +37,11 @@ fn main() {
             futhark::sync_futhark_keyboard_labels,
             futhark::emit_typed_futhark_input_from_keyboard,
             futhark::emit_typed_futhark_input_from_keyboard_clicks,
+            futhark::sync_futhark_key_hover,
+            futhark::animate_futhark_keyboard_colors,
             update_typed_rune,
+            handle_speed_buttons,
+            sync_speed_label,
         )
             .chain()
             .run_if(in_state(GameState::Ready)),
@@ -49,6 +68,98 @@ fn spawn_typed_rune_display(mut commands: Commands, game_assets: Res<GameAssets>
         Visibility::Hidden,
         TypedRuneDisplay,
     ));
+}
+
+fn spawn_speed_controls(mut commands: Commands, speed: Res<FutharkKeyboardAnimationSpeed>) {
+    commands
+        .spawn(Node {
+            position_type: PositionType::Absolute,
+            top: Val::Px(16.0),
+            right: Val::Px(16.0),
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(8.0),
+            ..default()
+        })
+        .with_children(|parent| {
+            parent
+                .spawn((
+                    Button,
+                    Node {
+                        width: Val::Px(32.0),
+                        height: Val::Px(32.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
+                    SpeedButton { delta: -SPEED_STEP },
+                ))
+                .with_child((
+                    Text::new("-"),
+                    TextFont {
+                        font_size: 20.0,
+                        ..default()
+                    },
+                    TextColor(Color::WHITE),
+                ));
+
+            parent.spawn((
+                Text::new(format!("{:.0} °/s", speed.hue_degrees_per_second)),
+                TextFont {
+                    font_size: 16.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+                SpeedLabel,
+            ));
+
+            parent
+                .spawn((
+                    Button,
+                    Node {
+                        width: Val::Px(32.0),
+                        height: Val::Px(32.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
+                    SpeedButton { delta: SPEED_STEP },
+                ))
+                .with_child((
+                    Text::new("+"),
+                    TextFont {
+                        font_size: 20.0,
+                        ..default()
+                    },
+                    TextColor(Color::WHITE),
+                ));
+        });
+}
+
+fn handle_speed_buttons(
+    buttons: Query<(&Interaction, &SpeedButton), (Changed<Interaction>, With<Button>)>,
+    mut speed: ResMut<FutharkKeyboardAnimationSpeed>,
+) {
+    for (interaction, btn) in &buttons {
+        if *interaction == Interaction::Pressed {
+            speed.hue_degrees_per_second =
+                (speed.hue_degrees_per_second + btn.delta).clamp(SPEED_MIN, SPEED_MAX);
+        }
+    }
+}
+
+fn sync_speed_label(
+    speed: Res<FutharkKeyboardAnimationSpeed>,
+    mut labels: Query<&mut Text, With<SpeedLabel>>,
+) {
+    if !speed.is_changed() {
+        return;
+    }
+    for mut text in &mut labels {
+        *text = Text::new(format!("{:.0} °/s", speed.hue_degrees_per_second));
+    }
 }
 
 fn update_typed_rune(

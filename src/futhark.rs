@@ -29,10 +29,16 @@ pub struct FutharkKeyLabel {
 }
 
 #[derive(Component)]
+pub struct FutharkKeyBackground;
+
+#[derive(Component)]
 pub struct FutharkKeyRuneVisual;
 
 #[derive(Component)]
 pub struct FutharkKeyLetterVisual;
+
+const SPRITE_KEYBOARD_BG: usize = 254;
+const SPRITE_RUNE_OFFSET: usize = 24;
 
 #[derive(Resource, Default, Clone, Copy, PartialEq, Eq)]
 pub enum FutharkKeyboardLegendMode {
@@ -41,11 +47,25 @@ pub enum FutharkKeyboardLegendMode {
     Letters,
 }
 
+#[derive(Resource, Clone, Copy)]
+pub struct FutharkKeyboardAnimationSpeed {
+    pub hue_degrees_per_second: f32,
+}
+
+impl Default for FutharkKeyboardAnimationSpeed {
+    fn default() -> Self {
+        Self {
+            hue_degrees_per_second: 60.0,
+        }
+    }
+}
+
 #[derive(Message)]
 pub struct TypedFutharkInput(pub char);
 
 pub fn configure_futhark_keyboard(app: &mut App) {
     app.init_resource::<FutharkKeyboardLegendMode>();
+    app.init_resource::<FutharkKeyboardAnimationSpeed>();
     app.add_message::<TypedFutharkInput>();
 }
 
@@ -101,12 +121,30 @@ pub fn spawn_futhark_keyboard(mut commands: Commands, game_assets: Res<GameAsset
                                         height: Val::Px(48.0),
                                         justify_content: JustifyContent::Center,
                                         align_items: AlignItems::Center,
+                                        position_type: PositionType::Relative,
                                         ..default()
                                     },
-                                    BackgroundColor(Color::srgb(0.9, 0.9, 0.9)),
+                                    BackgroundColor(Color::NONE),
                                     FutharkKeyButton { index },
                                 ))
                                 .with_children(|key_parent| {
+                                    key_parent.spawn((
+                                        Node {
+                                            position_type: PositionType::Absolute,
+                                            width: Val::Px(48.0),
+                                            height: Val::Px(48.0),
+                                            ..default()
+                                        },
+                                        ImageNode::from_atlas_image(
+                                            game_assets.futhark.clone(),
+                                            TextureAtlas {
+                                                layout: game_assets.futhark_layout.clone(),
+                                                index: SPRITE_KEYBOARD_BG,
+                                            },
+                                        ),
+                                        FutharkKeyBackground,
+                                    ));
+
                                     key_parent.spawn((
                                         Node {
                                             width: Val::Px(32.0),
@@ -117,7 +155,7 @@ pub fn spawn_futhark_keyboard(mut commands: Commands, game_assets: Res<GameAsset
                                             game_assets.futhark.clone(),
                                             TextureAtlas {
                                                 layout: game_assets.futhark_layout.clone(),
-                                                index,
+                                                index: index + SPRITE_RUNE_OFFSET,
                                             },
                                         ),
                                         FutharkKeyRuneVisual,
@@ -134,7 +172,10 @@ pub fn spawn_futhark_keyboard(mut commands: Commands, game_assets: Res<GameAsset
                                             ..default()
                                         },
                                         TextColor(Color::BLACK),
-                                        Visibility::Hidden,
+                                        Node {
+                                            display: Display::None,
+                                            ..default()
+                                        },
                                         FutharkKeyLabel { index },
                                         FutharkKeyLetterVisual,
                                     ));
@@ -165,27 +206,48 @@ pub fn emit_typed_futhark_input_from_keyboard(
 }
 
 pub fn emit_typed_futhark_input_from_keyboard_clicks(
-    keys: Query<
-        (&Interaction, &FutharkKeyButton, &mut BackgroundColor),
-        (Changed<Interaction>, With<Button>),
-    >,
+    keys: Query<(&Interaction, &FutharkKeyButton), (Changed<Interaction>, With<Button>)>,
     mut typed_futhark_input: MessageWriter<TypedFutharkInput>,
 ) {
-    for (interaction, key, mut background_color) in keys {
-        match *interaction {
-            Interaction::Pressed => {
-                *background_color = BackgroundColor(Color::srgb(0.7, 0.7, 0.7));
-                if let Some(letter) = index_to_letter(key.index) {
-                    typed_futhark_input.write(TypedFutharkInput(letter));
-                }
-            }
-            Interaction::Hovered => {
-                *background_color = BackgroundColor(Color::srgb(0.8, 0.8, 0.8));
-            }
-            Interaction::None => {
-                *background_color = BackgroundColor(Color::srgb(0.9, 0.9, 0.9));
+    for (interaction, key) in &keys {
+        if *interaction == Interaction::Pressed {
+            if let Some(letter) = index_to_letter(key.index) {
+                typed_futhark_input.write(TypedFutharkInput(letter));
             }
         }
+    }
+}
+
+pub fn sync_futhark_key_hover(
+    buttons: Query<(&Interaction, &Children), (Changed<Interaction>, With<FutharkKeyButton>)>,
+    mut backgrounds: Query<&mut ImageNode, With<FutharkKeyBackground>>,
+) {
+    for (interaction, children) in &buttons {
+        for child in children.iter() {
+            if let Ok(mut image) = backgrounds.get_mut(child) {
+                image.color = match *interaction {
+                    Interaction::Hovered | Interaction::Pressed => Color::srgb(0.6, 0.7, 1.0),
+                    Interaction::None => Color::WHITE,
+                };
+            }
+        }
+    }
+}
+
+pub fn animate_futhark_keyboard_colors(
+    time: Res<Time>,
+    speed: Res<FutharkKeyboardAnimationSpeed>,
+    mut rune_images: Query<&mut ImageNode, With<FutharkKeyRuneVisual>>,
+    mut letter_colors: Query<&mut TextColor, With<FutharkKeyLetterVisual>>,
+) {
+    let hue = (time.elapsed_secs() * speed.hue_degrees_per_second) % 360.0;
+    let color = Color::hsl(hue, 1.0, 0.5);
+
+    for mut image in &mut rune_images {
+        image.color = color;
+    }
+    for mut text_color in &mut letter_colors {
+        text_color.0 = color;
     }
 }
 
@@ -203,12 +265,9 @@ pub fn toggle_futhark_keyboard_legend_mode(
 
 pub fn sync_futhark_keyboard_labels(
     mode: Res<FutharkKeyboardLegendMode>,
-    mut runes: Query<
-        &mut Visibility,
-        (With<FutharkKeyRuneVisual>, Without<FutharkKeyLetterVisual>),
-    >,
+    mut runes: Query<&mut Node, (With<FutharkKeyRuneVisual>, Without<FutharkKeyLetterVisual>)>,
     mut letters: Query<
-        (&FutharkKeyLabel, &mut Text, &mut Visibility),
+        (&FutharkKeyLabel, &mut Text, &mut Node),
         (With<FutharkKeyLetterVisual>, Without<FutharkKeyRuneVisual>),
     >,
 ) {
@@ -216,20 +275,20 @@ pub fn sync_futhark_keyboard_labels(
         return;
     }
 
-    let (rune_visibility, letter_visibility) = match *mode {
-        FutharkKeyboardLegendMode::Runes => (Visibility::Visible, Visibility::Hidden),
-        FutharkKeyboardLegendMode::Letters => (Visibility::Hidden, Visibility::Visible),
+    let (rune_display, letter_display) = match *mode {
+        FutharkKeyboardLegendMode::Runes => (Display::Flex, Display::None),
+        FutharkKeyboardLegendMode::Letters => (Display::None, Display::Flex),
     };
 
-    for mut visibility in &mut runes {
-        *visibility = rune_visibility;
+    for mut node in &mut runes {
+        node.display = rune_display;
     }
 
-    for (label, mut text, mut visibility) in &mut letters {
+    for (label, mut text, mut node) in &mut letters {
         if let Some(letter) = index_to_letter(label.index) {
             *text = Text::new(letter.to_string());
         }
-        *visibility = letter_visibility;
+        node.display = letter_display;
     }
 }
 
