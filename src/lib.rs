@@ -8,6 +8,7 @@ pub mod loading;
 pub enum GameState {
     #[default]
     Loading,
+    RuneReveal,
     Ready,
 }
 

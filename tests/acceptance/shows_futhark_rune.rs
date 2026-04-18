@@ -9,7 +9,7 @@ fn main() {
     configure_app(&mut app);
     configure_loading(&mut app);
     app.add_systems(OnEnter(GameState::Ready), spawn_futhark_rune);
-    acceptance::initialize_app(&mut app, TEST_ID, "Displays a single futhark rune");
+    acceptance::initialize_app(&mut app, TEST_ID.into(), "Displays a single futhark rune");
     app.run();
 }
 

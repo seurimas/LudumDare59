@@ -9,9 +9,18 @@ When you are asked to do something, it should fall under a certain umbrella. Bas
 - tasks/TASK_BUGFIX.md
   - This is a bugfix.
 
+## Running UAT binaries
+
+Always run UAT binaries with `cargo run --bin <name>` from the project root. This ensures the `assets/` directory is found relative to the working directory. Never launch the compiled `.exe` directly (e.g. via `Start-Process` or by path), as it will not find assets.
+
+Example:
+```
+cargo run --bin uat_shows_loading_rune_reveal
+```
+
 ## Post-work checklist
 
-After completing ANY work, always run `cargo test`. Additionally, identify any new or changed UAT tests. Run them and expect a zero output. If you get a non-zero output, use AskUserQuestion or similar tool to ask what went wrong and iterate on the feedback.
+After completing ANY work, always run `cargo test`. Additionally, identify any new or changed UAT tests. Run them with `cargo run --bin <name>` and expect a zero output. If you get a non-zero output, use AskUserQuestion or similar tool to ask what went wrong and iterate on their feedback.
 
 Verify that your changes have not introduced new problems. When that is complete, go ahead and do all of the following:
 
