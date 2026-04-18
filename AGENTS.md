@@ -60,3 +60,7 @@ Then, report on the results to the user.
 ## Commit messages
 
 Keep commit messages short (one line). Do not sign with a co-author tag or your name.
+
+## Memory
+
+Do not write memories to the external memory system. Keep all persistent notes in checked-in files like this one.
