@@ -78,7 +78,8 @@ pub fn configure_app(app: &mut App) {
         )
             .chain()
             .run_if(in_state(GameState::Ready)),
-    );
+    )
+    .add_systems(OnEnter(GameState::Ready), futhark::bake_futhark_key_sounds);
 }
 
 pub fn configure_loading(app: &mut App) {

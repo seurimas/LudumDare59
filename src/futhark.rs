@@ -2,6 +2,7 @@ use bevy::ecs::message::{MessageReader, MessageWriter};
 use bevy::input::ButtonState;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::prelude::*;
+use rand::Rng;
 
 use crate::GameAssets;
 
@@ -63,24 +64,28 @@ impl Default for FutharkKeyboardAnimationSpeed {
 #[derive(Message)]
 pub struct TypedFutharkInput(pub char);
 
+#[derive(Resource, Default)]
+pub struct PrebakedFutharkAudio {
+    pub handles_by_index: Vec<Vec<Handle<crate::audio::ProcessedAudio>>>,
+}
+
 pub fn configure_futhark_keyboard(app: &mut App) {
     app.init_resource::<FutharkKeyboardLegendMode>();
     app.init_resource::<FutharkKeyboardAnimationSpeed>();
     app.add_message::<TypedFutharkInput>();
 }
 
-pub fn play_futhark_key_sound(
-    mut typed_futhark_input: MessageReader<TypedFutharkInput>,
-    game_assets: Res<crate::GameAssets>,
+pub fn bake_futhark_key_sounds(
+    game_assets: Res<GameAssets>,
     audio_sources: Res<Assets<AudioSource>>,
     sound_configs: Res<Assets<crate::audio::FutharkSoundConfig>>,
     mut processed_audios: ResMut<Assets<crate::audio::ProcessedAudio>>,
     mut commands: Commands,
 ) {
-    for event in typed_futhark_input.read() {
-        let Some(index) = letter_to_index(event.0) else {
-            continue;
-        };
+    let config = sound_configs.get(&game_assets.futhark_sound_params);
+    let mut handles_by_index = vec![Vec::new(); LETTERS.len()];
+
+    for index in 0..LETTERS.len() {
         let Some(raw) = game_assets.futhark_sounds.get(index) else {
             continue;
         };
@@ -88,10 +93,75 @@ pub fn play_futhark_key_sound(
             continue;
         };
 
-        let config = sound_configs.get(&game_assets.futhark_sound_params);
-        let params = crate::audio::pick_params(config, index);
-        let audio = crate::audio::process_audio(&source.bytes, &params);
-        let handle = processed_audios.add(audio);
+        let params_for_index = params_to_bake_for_index(config, index);
+        for params in params_for_index {
+            let processed = crate::audio::process_audio(&source.bytes, &params);
+            handles_by_index[index].push(processed_audios.add(processed));
+        }
+    }
+
+    commands.insert_resource(PrebakedFutharkAudio { handles_by_index });
+}
+
+fn params_to_bake_for_index(
+    config: Option<&crate::audio::FutharkSoundConfig>,
+    index: usize,
+) -> Vec<crate::audio::SoundParams> {
+    let variants = config
+        .and_then(|c| c.0.get(index))
+        .filter(|v| !v.is_empty());
+
+    let base_variants: Vec<crate::audio::SoundParams> = match variants {
+        None => vec![crate::audio::SoundParams::default()],
+        Some(v) => v.clone(),
+    };
+
+    let mut out = Vec::new();
+    for variant in base_variants {
+        if variant.reverb.is_empty() {
+            let mut resolved = variant;
+            resolved.selected_reverb = None;
+            out.push(resolved);
+            continue;
+        }
+
+        for reverb in &variant.reverb {
+            let mut resolved = variant.clone();
+            resolved.selected_reverb = Some(reverb.clone());
+            out.push(resolved);
+        }
+    }
+
+    out
+}
+
+pub fn play_futhark_key_sound(
+    mut typed_futhark_input: MessageReader<TypedFutharkInput>,
+    prebaked_audio: Option<Res<PrebakedFutharkAudio>>,
+    mut commands: Commands,
+) {
+    let Some(prebaked_audio) = prebaked_audio else {
+        return;
+    };
+
+    for event in typed_futhark_input.read() {
+        let Some(index) = letter_to_index(event.0) else {
+            continue;
+        };
+        let Some(handles) = prebaked_audio
+            .handles_by_index
+            .get(index)
+            .filter(|h| !h.is_empty())
+        else {
+            continue;
+        };
+
+        let handle = if handles.len() == 1 {
+            handles[0].clone()
+        } else {
+            let i = rand::thread_rng().gen_range(0..handles.len());
+            handles[i].clone()
+        };
         commands.spawn(AudioPlayer::<crate::audio::ProcessedAudio>(handle));
     }
 }
