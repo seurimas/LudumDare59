@@ -11,7 +11,9 @@ When you are asked to do something, it should fall under a certain umbrella. Bas
 
 ## Post-work checklist
 
-After completing ANY work, always run `cargo test`. Verify that your changes have not introduced new problems. When that is complete, go ahead and do all of the following:
+After completing ANY work, always run `cargo test`. Additionally, identify any new or changed UAT tests. Run them and expect a zero output. If you get a non-zero output, use AskUserQuestion or similar tool to ask what went wrong and iterate on the feedback.
+
+Verify that your changes have not introduced new problems. When that is complete, go ahead and do all of the following:
 
 ```
 cargo fmt
