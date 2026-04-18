@@ -1,6 +1,6 @@
 use LudumDare59::{
     GameAssets, GameState, acceptance, configure_app, configure_loading,
-    futhark::{self, FutharkKeyboardAnimationSpeed},
+    futhark::{self, FutharkKeyboardAnimationSpeed, spawn_futhark_keyboard},
 };
 use bevy::ecs::message::MessageReader;
 use bevy::prelude::*;
@@ -26,24 +26,12 @@ fn main() {
     app.add_plugins(DefaultPlugins);
     configure_app(&mut app);
     configure_loading(&mut app);
-    futhark::configure_futhark_keyboard(&mut app);
+    app.add_systems(OnEnter(GameState::Ready), spawn_futhark_keyboard);
     app.add_systems(OnEnter(GameState::Ready), spawn_typed_rune_display);
-    app.add_systems(OnEnter(GameState::Ready), futhark::spawn_futhark_keyboard);
     app.add_systems(OnEnter(GameState::Ready), spawn_speed_controls);
     app.add_systems(
         Update,
-        (
-            futhark::toggle_futhark_keyboard_legend_mode,
-            futhark::sync_futhark_keyboard_labels,
-            futhark::emit_typed_futhark_input_from_keyboard,
-            futhark::emit_typed_futhark_input_from_keyboard_clicks,
-            futhark::sync_futhark_key_hover,
-            futhark::animate_futhark_keyboard_colors,
-            futhark::play_futhark_key_sound,
-            update_typed_rune,
-            handle_speed_buttons,
-            sync_speed_label,
-        )
+        (update_typed_rune, handle_speed_buttons, sync_speed_label)
             .chain()
             .run_if(in_state(GameState::Ready)),
     );

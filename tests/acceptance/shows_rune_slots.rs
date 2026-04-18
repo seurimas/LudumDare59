@@ -1,10 +1,7 @@
 use LudumDare59::{
     GameAssets, GameState, acceptance, configure_app, configure_loading,
-    futhark::{self, FutharkKeyboardAnimationSpeed},
-    rune_slots::{
-        self, RuneSlotConfig, RuneSlotForegroundSet, activate_rune_slot_on_click, spawn_rune_slot,
-        sync_rune_slot_visuals, update_active_rune_slot_from_typed_input,
-    },
+    futhark::{FutharkKeyboardAnimationSpeed, spawn_futhark_keyboard},
+    rune_slots::{RuneSlotConfig, RuneSlotForegroundSet, spawn_rune_slot},
 };
 use bevy::prelude::*;
 
@@ -15,28 +12,9 @@ fn main() {
     app.add_plugins(DefaultPlugins);
     configure_app(&mut app);
     configure_loading(&mut app);
-    futhark::configure_futhark_keyboard(&mut app);
-    rune_slots::configure_rune_slots(&mut app);
 
-    app.add_systems(OnEnter(GameState::Ready), futhark::spawn_futhark_keyboard);
+    app.add_systems(OnEnter(GameState::Ready), spawn_futhark_keyboard);
     app.add_systems(OnEnter(GameState::Ready), spawn_demo_rune_slots);
-    app.add_systems(
-        Update,
-        (
-            futhark::toggle_futhark_keyboard_legend_mode,
-            futhark::sync_futhark_keyboard_labels,
-            futhark::emit_typed_futhark_input_from_keyboard,
-            futhark::emit_typed_futhark_input_from_keyboard_clicks,
-            futhark::sync_futhark_key_hover,
-            futhark::animate_futhark_keyboard_colors,
-            futhark::play_futhark_key_sound,
-            activate_rune_slot_on_click,
-            update_active_rune_slot_from_typed_input,
-            sync_rune_slot_visuals,
-        )
-            .chain()
-            .run_if(in_state(GameState::Ready)),
-    );
 
     acceptance::initialize_app(
         &mut app,
