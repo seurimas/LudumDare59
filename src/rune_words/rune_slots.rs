@@ -354,6 +354,7 @@ pub fn play_active_rune_word_audio(
     mut play_events: MessageReader<EnterActiveRuneWord>,
     active_slot: Res<ActiveRuneSlot>,
     slots: Query<(&RuneSlot, Option<&RuneSlotLinks>)>,
+    battle_state: Option<Res<crate::rune_words::battle::BattleState>>,
     prebaked_audio: Option<Res<crate::futhark::PrebakedFutharkConversationalAudio>>,
     baked_samples: Option<Res<crate::futhark::BakedAudioSamples>>,
     mut queue: ResMut<WordAudioQueue>,
@@ -364,6 +365,16 @@ pub fn play_active_rune_word_audio(
     }
 
     play_events.clear();
+
+    // In battle phases, Enter is used for guess submission and battle systems
+    // will queue any required confirmation playback explicitly.
+    if battle_state
+        .as_ref()
+        .map(|s| s.phase != crate::rune_words::battle::BattlePhase::Idle)
+        .unwrap_or(false)
+    {
+        return;
+    }
 
     let Some(prebaked_audio) = prebaked_audio else {
         return;
