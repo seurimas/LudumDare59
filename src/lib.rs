@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy_asset_loader::prelude::*;
 
 pub mod acceptance;
-pub mod audio_params;
+pub mod audio;
 pub mod dictionary;
 pub mod futhark;
 pub mod loading;
@@ -51,9 +51,9 @@ pub struct GameAssets {
     ))]
     pub futhark_sounds: Vec<UntypedHandle>,
     #[asset(path = "sound/params.json")]
-    pub futhark_sound_params: Handle<audio_params::FutharkSoundConfig>,
+    pub futhark_sound_params: Handle<audio::FutharkSoundConfig>,
     #[asset(path = "sound/conversational_params.json")]
-    pub futhark_conversational_params: Handle<audio_params::FutharkSoundConfig>,
+    pub futhark_conversational_params: Handle<audio::FutharkSoundConfig>,
 }
 
 pub fn configure_app(app: &mut App) {
@@ -82,6 +82,6 @@ pub fn configure_app(app: &mut App) {
 }
 
 pub fn configure_loading(app: &mut App) {
-    audio_params::configure_audio_params(app);
+    audio::configure_audio(app);
     loading::configure_loading(app);
 }

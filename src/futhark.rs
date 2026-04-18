@@ -73,8 +73,8 @@ pub fn play_futhark_key_sound(
     mut typed_futhark_input: MessageReader<TypedFutharkInput>,
     game_assets: Res<crate::GameAssets>,
     audio_sources: Res<Assets<AudioSource>>,
-    sound_configs: Res<Assets<crate::audio_params::FutharkSoundConfig>>,
-    mut processed_audios: ResMut<Assets<crate::audio_params::ProcessedAudio>>,
+    sound_configs: Res<Assets<crate::audio::FutharkSoundConfig>>,
+    mut processed_audios: ResMut<Assets<crate::audio::ProcessedAudio>>,
     mut commands: Commands,
 ) {
     for event in typed_futhark_input.read() {
@@ -89,10 +89,10 @@ pub fn play_futhark_key_sound(
         };
 
         let config = sound_configs.get(&game_assets.futhark_sound_params);
-        let params = crate::audio_params::pick_params(config, index);
-        let audio = crate::audio_params::process_audio(&source.bytes, &params);
+        let params = crate::audio::pick_params(config, index);
+        let audio = crate::audio::process_audio(&source.bytes, &params);
         let handle = processed_audios.add(audio);
-        commands.spawn(AudioPlayer::<crate::audio_params::ProcessedAudio>(handle));
+        commands.spawn(AudioPlayer::<crate::audio::ProcessedAudio>(handle));
     }
 }
 
