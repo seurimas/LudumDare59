@@ -10,17 +10,6 @@
         "wet": 0.25
       },
       "pitch_scale": 0.5
-    },
-    {
-      "volume": 0.8,
-      "duration_ms": 750,
-      "echo_decay": 0.4,
-      "reverb": {
-        "room_size": 0.06,
-        "decay": 0.5,
-        "wet": 0.2
-      },
-      "pitch_scale": 0.5
     }
   ],
   [
@@ -320,6 +309,19 @@
         "wet": 0.38
       },
       "pitch_scale": 1.888
+    }
+  ],
+  [
+    {
+      "volume": 1.0,
+      "duration_ms": 750,
+      "echo_decay": 0.5,
+      "reverb": {
+        "room_size": 0.16,
+        "decay": 0.72,
+        "wet": 0.38
+      },
+      "pitch_scale": 0.8
     }
   ]
 ]

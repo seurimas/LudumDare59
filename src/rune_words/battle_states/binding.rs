@@ -1,28 +1,33 @@
-use bevy::ecs::message::MessageReader;
+use bevy::ecs::message::{MessageReader, MessageWriter};
 use bevy::prelude::*;
 use std::collections::HashSet;
 
 use crate::rune_words::battle::{
     ACTIVE_ROW_TOP, BattlePhase, BattleRowMotion, BattleRuneSlot, BattleSet, BattleState, ROW_RISE,
-    RowResolved, collect_guess_submission, push_all_non_active_slots_up, reset_battle_state,
-    score_guess_submission, spawn_battle_row,
+    RowResolved, RuneMatchState, collect_guess_submission, push_all_non_active_slots_up,
+    reset_battle_state, score_guess_submission, spawn_battle_row,
 };
 use crate::rune_words::rune_slots::{
-    ActiveRuneSlot, EnterActiveRuneWord, RuneSlot, RuneSlotBackground,
+    ActiveRuneSlot, EnterActiveRuneWord, PlayFutharkLetters, RuneSlot, RuneSlotBackground,
 };
 use crate::{GameAssets, dictionary};
 
 #[derive(bevy::ecs::message::Message, Clone, Debug)]
 pub struct StartBinding(pub dictionary::Futharkation);
 
+#[derive(bevy::ecs::message::Message, Clone, Debug, Default)]
+pub struct BindingSucceeded;
+
 #[derive(Resource, Default)]
 pub struct BindingData {
     pub target: Option<dictionary::Futharkation>,
+    pub pending_success: bool,
 }
 
 pub fn configure_binding(app: &mut App) {
     app.init_resource::<BindingData>();
     app.add_message::<StartBinding>();
+    app.add_message::<BindingSucceeded>();
     app.add_systems(
         Update,
         (start_binding, score_binding_row_on_enter.run_if(is_binding)).chain(),
@@ -76,7 +81,7 @@ fn score_binding_row_on_enter(
     mut enter_events: MessageReader<EnterActiveRuneWord>,
     mut battle_state: ResMut<BattleState>,
     mut active_slot: ResMut<ActiveRuneSlot>,
-    binding_data: Res<BindingData>,
+    mut binding_data: ResMut<BindingData>,
     rune_slots: Query<&RuneSlot>,
     battle_slots: Query<&BattleRuneSlot>,
     slot_nodes: Query<(Entity, &Node), With<BattleRuneSlot>>,
@@ -109,6 +114,7 @@ fn score_binding_row_on_enter(
 
     let active_set: HashSet<Entity> = battle_state.active_row_slots.iter().copied().collect();
     let results = score_guess_submission(&guess, &target.letters);
+    let all_correct = results.iter().all(|r| matches!(r, RuneMatchState::Correct));
 
     active_slot.entity = None;
 
@@ -133,6 +139,7 @@ fn score_binding_row_on_enter(
 
     push_all_non_active_slots_up(&mut commands, &active_set, &slot_nodes);
 
+    binding_data.pending_success = all_correct;
     battle_state.active_row_slots.clear();
     battle_state.pending_resolved_row = Some(row_id);
     battle_state.pending_settle_frames = 1;
@@ -144,7 +151,9 @@ fn on_binding_row_resolved(
     mut battle_state: ResMut<BattleState>,
     mut active_slot: ResMut<ActiveRuneSlot>,
     mut row_resolved: MessageReader<RowResolved>,
-    binding_data: Res<BindingData>,
+    mut binding_data: ResMut<BindingData>,
+    mut succeeded: MessageWriter<BindingSucceeded>,
+    mut play_word: MessageWriter<PlayFutharkLetters>,
 ) {
     let Some(game_assets) = game_assets else {
         return;
@@ -157,6 +166,15 @@ fn on_binding_row_resolved(
     let Some(target) = binding_data.target.clone() else {
         return;
     };
+
+    if binding_data.pending_success {
+        binding_data.pending_success = false;
+        battle_state.phase = BattlePhase::Idle;
+        active_slot.entity = None;
+        play_word.write(PlayFutharkLetters(target.letters.clone()));
+        succeeded.write(BindingSucceeded);
+        return;
+    }
 
     let row = spawn_battle_row(
         &mut commands,
@@ -336,5 +354,75 @@ mod tests {
             .top;
         assert_eq!(first_top, Val::Px(ACTIVE_ROW_TOP - ROW_RISE * 2.0));
         assert_eq!(second_top, Val::Px(ACTIVE_ROW_TOP - ROW_RISE));
+    }
+
+    #[test]
+    fn binding_exact_match_sets_pending_success() {
+        let mut app = make_test_app();
+        let target = dictionary::Futharkation {
+            word: "fable".to_string(),
+            letters: "futar".to_string(),
+        };
+        app.world_mut().write_message(StartBinding(target));
+        app.update();
+
+        fill_active_row(&mut app, "futar");
+        app.world_mut().write_message(EnterActiveRuneWord);
+        app.update();
+
+        assert!(
+            app.world().resource::<BindingData>().pending_success,
+            "exact match should set pending_success"
+        );
+    }
+
+    #[test]
+    fn binding_partial_match_does_not_set_pending_success() {
+        let mut app = make_test_app();
+        app.world_mut()
+            .write_message(StartBinding(dictionary::Futharkation {
+                word: "fable".to_string(),
+                letters: "futar".to_string(),
+            }));
+        app.update();
+
+        fill_active_row(&mut app, "futxx");
+        app.world_mut().write_message(EnterActiveRuneWord);
+        app.update();
+
+        assert!(
+            !app.world().resource::<BindingData>().pending_success,
+            "partial match should not set pending_success"
+        );
+    }
+
+    #[test]
+    fn binding_success_transitions_to_idle_and_spawns_no_new_row() {
+        let mut app = make_test_app();
+        app.world_mut()
+            .write_message(StartBinding(dictionary::Futharkation {
+                word: "fable".to_string(),
+                letters: "futar".to_string(),
+            }));
+        app.update();
+
+        fill_active_row(&mut app, "futar");
+        app.world_mut().write_message(EnterActiveRuneWord);
+        app.update();
+
+        for _ in 0..10 {
+            app.update();
+        }
+
+        let state = app.world().resource::<BattleState>();
+        assert_eq!(
+            state.phase,
+            BattlePhase::Idle,
+            "phase should be Idle after binding success"
+        );
+        assert!(
+            state.active_row_slots.is_empty(),
+            "no new row should be spawned after success"
+        );
     }
 }

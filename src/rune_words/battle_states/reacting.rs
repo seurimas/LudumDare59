@@ -8,7 +8,7 @@ use crate::rune_words::battle::{
     reset_battle_state, score_guess_submission, spawn_battle_row,
 };
 use crate::rune_words::rune_slots::{
-    ActiveRuneSlot, EnterActiveRuneWord, RuneSlot, RuneSlotBackground,
+    ActiveRuneSlot, EnterActiveRuneWord, PlayFutharkLetters, RuneSlot, RuneSlotBackground,
 };
 use crate::{GameAssets, dictionary};
 
@@ -160,6 +160,7 @@ fn score_reacting_row_on_enter(
     slot_children: Query<&Children>,
     mut backgrounds: Query<&mut RuneSlotBackground>,
     mut succeeded: MessageWriter<ReactingSucceeded>,
+    mut play_word: MessageWriter<PlayFutharkLetters>,
 ) {
     if enter_events.is_empty() {
         return;
@@ -216,6 +217,7 @@ fn score_reacting_row_on_enter(
     if all_correct {
         reacting_data.active = false;
         battle_state.phase = BattlePhase::Idle;
+        play_word.write(PlayFutharkLetters(target.letters.clone()));
         succeeded.write(ReactingSucceeded);
     }
 

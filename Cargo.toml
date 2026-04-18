@@ -51,4 +51,4 @@ path = "tests/acceptance/shows_reacting_battle_state.rs"
 
 [[bin]]
 name = "uat_battle_stages"
-path = "tests/acceptance/battle_stages.rs"
+path = "tests/acceptance/uat_battle_stages.rs"

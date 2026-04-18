@@ -9,9 +9,9 @@ use std::sync::Arc;
 use crate::{GameAssets, futhark};
 
 const SPRITE_SLOT_BACKGROUND: usize = 255;
-const SPRITE_PRIMARY_RUNE_OFFSET: usize = 24;
-const SPRITE_ALTERNATE_RUNE_OFFSET: usize = 48;
-const RUNES_PER_SET: usize = 24;
+const SPRITE_PRIMARY_RUNE_OFFSET: usize = 32;
+const SPRITE_ALTERNATE_RUNE_OFFSET: usize = 64;
+const RUNES_PER_SET: usize = 25;
 const ALTERNATE_SET_PAGES: usize = 2;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -68,6 +68,9 @@ pub struct ActiveRuneSlot {
 #[derive(Message, Default)]
 pub struct EnterActiveRuneWord;
 
+#[derive(bevy::ecs::message::Message, Clone)]
+pub struct PlayFutharkLetters(pub String);
+
 pub struct RuneSlotConfig {
     pub left: Val,
     pub top: Val,
@@ -93,6 +96,7 @@ impl Default for RuneSlotConfig {
 pub fn configure_rune_slots(app: &mut App) {
     app.init_resource::<ActiveRuneSlot>();
     app.add_message::<EnterActiveRuneWord>();
+    app.add_message::<PlayFutharkLetters>();
 }
 
 pub fn spawn_rune_slot(
@@ -351,6 +355,57 @@ pub fn play_active_rune_word_audio(
     ));
 }
 
+pub fn play_futhark_letters_audio(
+    mut play_events: MessageReader<PlayFutharkLetters>,
+    prebaked_audio: Option<Res<crate::futhark::PrebakedFutharkConversationalAudio>>,
+    mut processed_audio_assets: ResMut<Assets<crate::audio::ProcessedAudio>>,
+    mut commands: Commands,
+) {
+    let Some(PlayFutharkLetters(letters)) = play_events.read().last().cloned() else {
+        return;
+    };
+
+    let Some(prebaked_audio) = prebaked_audio else {
+        return;
+    };
+
+    let mut combined_samples: Vec<f32> = Vec::new();
+    let mut channels = 0u16;
+    let mut sample_rate = 0u32;
+
+    for rune_index in letters.chars().filter_map(crate::futhark::letter_to_index) {
+        let Some(handle) = prebaked_audio
+            .handles_by_index
+            .get(rune_index)
+            .and_then(|handles| handles.first())
+        else {
+            continue;
+        };
+        let Some(processed) = processed_audio_assets.get(handle) else {
+            continue;
+        };
+        if channels == 0 {
+            channels = processed.channels;
+            sample_rate = processed.sample_rate;
+        }
+        if processed.channels != channels || processed.sample_rate != sample_rate {
+            continue;
+        }
+        combined_samples.extend_from_slice(&processed.samples);
+    }
+
+    if combined_samples.is_empty() {
+        return;
+    }
+
+    let handle = processed_audio_assets.add(crate::audio::ProcessedAudio {
+        samples: Arc::<[f32]>::from(combined_samples),
+        channels,
+        sample_rate,
+    });
+    commands.spawn(AudioPlayer::<crate::audio::ProcessedAudio>(handle));
+}
+
 fn collect_word_rune_indices(
     active_entity: Entity,
     slots: &Query<(&RuneSlot, Option<&RuneSlotLinks>)>,
@@ -450,28 +505,28 @@ mod tests {
     use super::*;
 
     #[test]
-    fn primary_foreground_set_uses_sprites_24_to_47() {
-        assert_eq!(RuneSlotForegroundSet::Primary.sprite_index_for_rune(0), 24);
-        assert_eq!(RuneSlotForegroundSet::Primary.sprite_index_for_rune(23), 47);
+    fn primary_foreground_set_uses_sprites_32_to_56() {
+        assert_eq!(RuneSlotForegroundSet::Primary.sprite_index_for_rune(0), 32);
+        assert_eq!(RuneSlotForegroundSet::Primary.sprite_index_for_rune(24), 56);
     }
 
     #[test]
-    fn alternate_foreground_set_uses_sprites_48_to_95() {
+    fn alternate_foreground_set_uses_sprites_64_to_113() {
         assert_eq!(
             RuneSlotForegroundSet::Alternate { page: 0 }.sprite_index_for_rune(0),
-            48
+            64
         );
         assert_eq!(
-            RuneSlotForegroundSet::Alternate { page: 0 }.sprite_index_for_rune(23),
-            71
+            RuneSlotForegroundSet::Alternate { page: 0 }.sprite_index_for_rune(24),
+            88
         );
         assert_eq!(
             RuneSlotForegroundSet::Alternate { page: 1 }.sprite_index_for_rune(0),
-            72
+            89
         );
         assert_eq!(
-            RuneSlotForegroundSet::Alternate { page: 1 }.sprite_index_for_rune(23),
-            95
+            RuneSlotForegroundSet::Alternate { page: 1 }.sprite_index_for_rune(24),
+            113
         );
     }
 
@@ -479,7 +534,7 @@ mod tests {
     fn alternate_foreground_page_is_clamped_to_supported_range() {
         assert_eq!(
             RuneSlotForegroundSet::Alternate { page: 99 }.sprite_index_for_rune(3),
-            75
+            92
         );
     }
 

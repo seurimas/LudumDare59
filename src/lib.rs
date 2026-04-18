@@ -22,11 +22,11 @@ pub struct GameAssets {
     pub futhark: Handle<Image>,
     #[asset(texture_atlas_layout(tile_size_x = 32, tile_size_y = 32, columns = 16, rows = 16))]
     pub futhark_layout: Handle<TextureAtlasLayout>,
-    // Ordered by futhark::LETTERS: f u 7 a r k g w h n i j A p z s t b e m l N d o
+    // Ordered by futhark::LETTERS: f u T a r k g w h n i j A p z s t b e m l N d o S
     #[asset(paths(
         "sound/f.ogg",
         "sound/u.ogg",
-        "sound/7.ogg",
+        "sound/T.ogg",
         "sound/a.ogg",
         "sound/r.ogg",
         "sound/k.ogg",
@@ -47,7 +47,8 @@ pub struct GameAssets {
         "sound/l.ogg",
         "sound/N-2.ogg",
         "sound/d.ogg",
-        "sound/o.ogg"
+        "sound/o.ogg",
+        "sound/S-2.ogg"
     ))]
     pub futhark_sounds: Vec<UntypedHandle>,
     #[asset(path = "sound/params.json")]
@@ -76,6 +77,7 @@ pub fn configure_app(app: &mut App) {
             rune_words::rune_slots::handle_backspace_in_rune_slots,
             rune_words::rune_slots::emit_play_active_rune_word_audio_on_enter,
             rune_words::rune_slots::play_active_rune_word_audio,
+            rune_words::rune_slots::play_futhark_letters_audio,
             rune_words::rune_slots::sync_rune_slot_visuals,
         )
             .chain()

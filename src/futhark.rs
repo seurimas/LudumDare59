@@ -6,15 +6,39 @@ use rand::Rng;
 
 use crate::GameAssets;
 
-pub const LETTERS: [char; 24] = [
-    'f', 'u', '7', 'a', 'r', 'k', 'g', 'w', 'h', 'n', 'i', 'j', 'A', 'p', 'z', 's', 't', 'b', 'e',
-    'm', 'l', 'N', 'd', 'o',
+pub const LETTERS: [char; 25] = [
+    'f', // 0
+    'u', // 1
+    'T', // 2
+    'a', // 3
+    'r', // 4
+    'k', // 5
+    'g', // 6
+    'w', // 7
+    'h', // 8
+    'n', // 9
+    'i', // 10
+    'j', // 11
+    'A', // 12
+    'p', // 13
+    'z', // 14
+    's', // 15
+    't', // 16
+    'b', // 17
+    'e', // 18
+    'm', // 19
+    'l', // 20
+    'N', // 21
+    'd', // 22
+    'o', // 23
+    'S', // 24
 ];
 
-const KEYBOARD_ROW_OFFSETS: [f32; 3] = [0.0, 40.0, 80.0];
-const KEYBOARD_TOP_ROW: [usize; 9] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
-const KEYBOARD_MIDDLE_ROW: [usize; 8] = [10, 11, 12, 0, 13, 14, 15, 16];
-const KEYBOARD_BOTTOM_ROW: [usize; 7] = [17, 18, 19, 20, 21, 22, 23];
+const KEYBOARD_ROW_OFFSETS: [f32; 3] = [0.0, 32.0, 64.0];
+// Each number shows up once, in a similar place to a QWERTY keyboard.
+const KEYBOARD_TOP_ROW: [usize; 10] = [12, 7, 18, 4, 16, 2, 1, 10, 23, 13];
+const KEYBOARD_MIDDLE_ROW: [usize; 9] = [3, 15, 22, 0, 6, 8, 11, 5, 20];
+const KEYBOARD_BOTTOM_ROW: [usize; 6] = [14, 24, 21, 17, 9, 19];
 
 #[derive(Component)]
 pub struct FutharkKeyboard;
@@ -39,7 +63,7 @@ pub struct FutharkKeyRuneVisual;
 pub struct FutharkKeyLetterVisual;
 
 const SPRITE_KEYBOARD_BG: usize = 254;
-pub const SPRITE_RUNE_OFFSET: usize = 24;
+pub const SPRITE_RUNE_OFFSET: usize = 32;
 
 #[derive(Resource, Default, Clone, Copy, PartialEq, Eq)]
 pub enum FutharkKeyboardLegendMode {
@@ -405,22 +429,8 @@ mod tests {
 
     #[test]
     fn unknown_values_are_rejected() {
-        assert_eq!(index_to_letter(24), None);
+        assert_eq!(index_to_letter(25), None);
         assert_eq!(letter_to_index('x'), None);
-    }
-
-    #[test]
-    fn keyboard_rows_match_expected_staggered_shape() {
-        let rows = keyboard_rows_by_index();
-        assert_eq!(rows[0].len(), 9);
-        assert_eq!(rows[1].len(), 8);
-        assert_eq!(rows[2].len(), 7);
-    }
-
-    #[test]
-    fn rune_zero_is_fourth_key_in_middle_row() {
-        let rows = keyboard_rows_by_index();
-        assert_eq!(rows[1][3], 0);
     }
 
     #[test]
@@ -432,7 +442,7 @@ mod tests {
             .collect::<Vec<_>>();
         all_indices.sort_unstable();
 
-        let expected_indices = (0..24).collect::<Vec<_>>();
+        let expected_indices = (0..25).collect::<Vec<_>>();
         assert_eq!(all_indices, expected_indices);
     }
 }

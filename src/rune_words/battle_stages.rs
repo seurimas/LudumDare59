@@ -2,8 +2,8 @@ use bevy::ecs::message::{MessageReader, MessageWriter};
 use bevy::prelude::*;
 
 use crate::dictionary::Futharkation;
-use crate::rune_words::battle_states::acting::StartActing;
-use crate::rune_words::battle_states::binding::StartBinding;
+use crate::rune_words::battle_states::acting::{ActingSucceeded, StartActing};
+use crate::rune_words::battle_states::binding::BindingSucceeded;
 use crate::rune_words::battle_states::reacting::{
     ReactingFailed, ReactingSucceeded, StartReacting,
 };
@@ -16,16 +16,18 @@ pub struct WordBook {
 #[derive(bevy::ecs::message::Message, Clone, Debug)]
 pub struct QuickTime(pub Futharkation);
 
-#[derive(bevy::ecs::message::Message, Clone, Debug)]
-pub struct FinalChallenge(pub Futharkation);
-
 pub fn configure_battle_stages(app: &mut App) {
     app.init_resource::<WordBook>();
     app.add_message::<QuickTime>();
-    app.add_message::<FinalChallenge>();
     app.add_systems(
         Update,
-        (on_quicktime, on_reacting_resolved, on_final_challenge).chain(),
+        (
+            on_quicktime,
+            on_reacting_resolved,
+            on_acting_succeeded,
+            on_binding_succeeded,
+        )
+            .chain(),
     );
 }
 
@@ -57,11 +59,32 @@ fn on_reacting_resolved(
     }
 }
 
-fn on_final_challenge(
-    mut challenge: MessageReader<FinalChallenge>,
-    mut start_binding: MessageWriter<StartBinding>,
+fn on_acting_succeeded(
+    mut succeeded: MessageReader<ActingSucceeded>,
+    mut start_acting: MessageWriter<StartActing>,
+    book: Res<WordBook>,
 ) {
-    for FinalChallenge(word) in challenge.read() {
-        start_binding.write(StartBinding(word.clone()));
+    if !succeeded.is_empty() {
+        succeeded.clear();
+        if !book.words.is_empty() {
+            start_acting.write(StartActing {
+                targets: book.words.clone(),
+            });
+        }
+    }
+}
+
+fn on_binding_succeeded(
+    mut succeeded: MessageReader<BindingSucceeded>,
+    mut start_acting: MessageWriter<StartActing>,
+    book: Res<WordBook>,
+) {
+    if !succeeded.is_empty() {
+        succeeded.clear();
+        if !book.words.is_empty() {
+            start_acting.write(StartActing {
+                targets: book.words.clone(),
+            });
+        }
     }
 }

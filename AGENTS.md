@@ -20,6 +20,8 @@ cargo run --bin uat_shows_loading_rune_reveal
 
 If the UAT exits with status 0, then that means I have approved the state of the UAT! Good job! If not, ask about what can be done to improve things.
 
+NEVER kill a UAT. Expect that it may take some time to verify.
+
 ## Pre-work checklist
 
 Do `git log -3` before beginning work. This will highlight the most recent work and where progress is being made. This may help inform your current task, but do not assume it should if the link is not clear.

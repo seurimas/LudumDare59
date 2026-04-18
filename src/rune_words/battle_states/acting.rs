@@ -8,7 +8,7 @@ use crate::rune_words::battle::{
     push_all_non_active_slots_up, reset_battle_state, score_guess_submission, spawn_battle_row,
 };
 use crate::rune_words::rune_slots::{
-    ActiveRuneSlot, EnterActiveRuneWord, RuneSlot, RuneSlotBackground,
+    ActiveRuneSlot, EnterActiveRuneWord, PlayFutharkLetters, RuneSlot, RuneSlotBackground,
 };
 use crate::{GameAssets, dictionary};
 
@@ -28,6 +28,7 @@ pub struct ActingData {
     pub targets: Vec<dictionary::Futharkation>,
     pub max_rune_count: usize,
     pub pending_success: bool,
+    pub pending_matched: Option<dictionary::Futharkation>,
 }
 
 #[derive(Component)]
@@ -84,6 +85,7 @@ fn start_acting(
     acting_data.targets = targets;
     acting_data.max_rune_count = max_rune_count;
     acting_data.pending_success = false;
+    acting_data.pending_matched = None;
 
     let row = spawn_battle_row(
         &mut commands,
@@ -211,7 +213,7 @@ fn score_acting_row_on_enter(
 
     acting_data.pending_success = correct >= 2;
     if acting_data.pending_success {
-        acting_data.targets = vec![best_target]; // keep only the matched target for post-resolve
+        acting_data.pending_matched = Some(best_target);
     }
 
     battle_state.active_row_slots.clear();
@@ -227,6 +229,7 @@ fn on_acting_row_resolved(
     mut row_resolved: MessageReader<RowResolved>,
     mut acting_data: ResMut<ActingData>,
     mut succeeded: MessageWriter<ActingSucceeded>,
+    mut play_word: MessageWriter<PlayFutharkLetters>,
 ) {
     let Some(game_assets) = game_assets else {
         return;
@@ -237,7 +240,7 @@ fn on_acting_row_resolved(
     row_resolved.clear();
 
     if acting_data.pending_success {
-        let matched =
+        let matched = acting_data.pending_matched.take().unwrap_or_else(|| {
             acting_data
                 .targets
                 .first()
@@ -245,8 +248,11 @@ fn on_acting_row_resolved(
                 .unwrap_or_else(|| dictionary::Futharkation {
                     word: String::new(),
                     letters: String::new(),
-                });
+                })
+        });
+        acting_data.pending_success = false;
         battle_state.phase = BattlePhase::Idle;
+        play_word.write(PlayFutharkLetters(matched.letters.clone()));
         succeeded.write(ActingSucceeded {
             matched,
             results: Vec::new(),
@@ -429,6 +435,27 @@ mod tests {
         assert!(
             acting_data.pending_success,
             "3 correct runes should set pending_success"
+        );
+    }
+
+    #[test]
+    fn acting_success_keeps_accepting_book_words() {
+        let mut app = make_test_app();
+        let targets = vec![futha("fable", "futar"), futha("dune", "dune")];
+        app.world_mut().write_message(StartActing {
+            targets: targets.clone(),
+        });
+        app.update();
+
+        fill_active_row(&mut app, "futxx");
+        app.world_mut().write_message(EnterActiveRuneWord);
+        app.update();
+
+        let acting_data = app.world().resource::<ActingData>();
+        assert!(acting_data.pending_success);
+        assert_eq!(
+            acting_data.targets, targets,
+            "success should not collapse acting targets to one matched word"
         );
     }
 

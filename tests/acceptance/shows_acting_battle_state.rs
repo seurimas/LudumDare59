@@ -22,7 +22,7 @@ fn main() {
     acceptance::initialize_app(
         &mut app,
         TEST_ID.into(),
-        "Acting battle state: enter three specific words of varying lengths. Each scored row shows correct/misplaced/wrong counts and rises. After all targets, the phase ends.",
+        "Acting battle state: guess target words. On success, acting ends.",
     );
 
     app.run();
@@ -59,19 +59,26 @@ fn start_demo(
         children![
             (
                 Text::new(format!("StartActing: {}", label)),
-                TextFont { font_size: 22.0, ..default() },
+                TextFont {
+                    font_size: 22.0,
+                    ..default()
+                },
                 TextColor(Color::WHITE),
             ),
             (
-                Text::new(
-                    "Acting state: enter each target word. Each scored row shows ✓~/✗ counts and rises. After all words, the phase ends.",
-                ),
-                TextFont { font_size: 18.0, ..default() },
+                Text::new("Acting: guess until ≥2 correct. Successful guess ends acting.",),
+                TextFont {
+                    font_size: 18.0,
+                    ..default()
+                },
                 TextColor(Color::WHITE),
             ),
             (
                 Text::new("Press F1 to pass or F2 to fail."),
-                TextFont { font_size: 18.0, ..default() },
+                TextFont {
+                    font_size: 18.0,
+                    ..default()
+                },
                 TextColor(Color::WHITE),
             ),
         ],

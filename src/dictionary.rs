@@ -165,12 +165,12 @@ fn naive_ipa_to_futhark(symbol: char) -> Option<char> {
         'ɡ' => Some('g'),
         'f' => Some('f'),
         'v' => Some('f'),
-        'θ' => Some('t'),
-        'ð' => Some('d'),
+        'θ' => Some('T'),
+        'ð' => Some('T'),
+        'ʃ' => Some('S'),
+        'ʒ' => Some('S'),
         's' => Some('s'),
         'z' => Some('z'),
-        'ʃ' => Some('7'),
-        'ʒ' => Some('z'),
         'h' => Some('h'),
         'm' => Some('m'),
         'n' => Some('n'),
@@ -207,6 +207,7 @@ mod tests {
     use super::*;
     use rand::SeedableRng;
     use rand::rngs::StdRng;
+    use std::collections::BTreeSet;
 
     #[test]
     fn parses_a_dictionary_line() {
@@ -233,17 +234,17 @@ mod tests {
     }
 
     #[test]
-    fn dictionary_can_be_mapped_to_futhark_or_reports_missing_symbol() {
+    fn dictionary_reports_no_missing_ipa_symbols() {
         let pronunciations = load_default_pronunciations().expect("dictionary parses");
+        let mut missing_symbols = BTreeSet::new();
 
         for pronunciation in pronunciations {
             if let Err(missing) = pronunciation.to_futharkation() {
-                panic!(
-                    "Missing futhark mapping for IPA symbol '{}' while mapping '{}' ({})",
-                    missing.symbol, missing.word, missing.ipa
-                );
+                missing_symbols.insert(missing.symbol);
             }
         }
+
+        assert_eq!(missing_symbols.into_iter().collect::<Vec<char>>(), vec![]);
     }
 
     #[test]
