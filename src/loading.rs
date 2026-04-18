@@ -37,7 +37,7 @@ impl Default for ProcessingQueue {
     }
 }
 
-const FUTHARK_LETTER_COUNT: usize = 24;
+const FUTHARK_LETTER_COUNT: usize = 25;
 const RUNE_COUNT: usize = 5;
 const RUNE_SPACING: f32 = 48.0;
 const FADE_DURATION_SECONDS: f32 = 0.2;

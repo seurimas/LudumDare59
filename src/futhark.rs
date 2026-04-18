@@ -3,6 +3,7 @@ use bevy::input::ButtonState;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::prelude::*;
 use rand::Rng;
+use std::collections::HashMap;
 
 use crate::GameAssets;
 
@@ -34,11 +35,11 @@ pub const LETTERS: [char; 25] = [
     'S', // 24
 ];
 
-const KEYBOARD_ROW_OFFSETS: [f32; 3] = [0.0, 32.0, 64.0];
+const KEYBOARD_ROW_OFFSETS: [f32; 3] = [-64.0, 32.0, 64.0];
 // Each number shows up once, in a similar place to a QWERTY keyboard.
 const KEYBOARD_TOP_ROW: [usize; 10] = [12, 7, 18, 4, 16, 2, 1, 10, 23, 13];
 const KEYBOARD_MIDDLE_ROW: [usize; 9] = [3, 15, 22, 0, 6, 8, 11, 5, 20];
-const KEYBOARD_BOTTOM_ROW: [usize; 6] = [14, 24, 21, 17, 9, 19];
+const KEYBOARD_BOTTOM_ROW: [usize; 7] = [14, 24, 21, usize::MAX, 17, 9, 19];
 
 #[derive(Component)]
 pub struct FutharkKeyboard;
@@ -79,6 +80,8 @@ pub struct FutharkKeyRuneVisual;
 pub struct FutharkKeyLetterVisual;
 
 const SPRITE_KEYBOARD_BG: usize = 254;
+const SPRITE_TAB_ACTION: usize = 252;
+const SPRITE_BACKSPACE_ACTION: usize = 251;
 pub const SPRITE_RUNE_OFFSET: usize = 32;
 
 #[derive(Resource, Default, Clone, Copy, PartialEq, Eq)]
@@ -107,6 +110,38 @@ pub struct TypedFutharkInput(pub char);
 #[derive(Message, Clone, Copy)]
 pub struct FutharkKeyboardCommand(pub FutharkKeyboardCommandType);
 
+#[derive(Resource, Clone)]
+pub struct FutharkKeyboardAliases {
+    alias_to_rune: HashMap<char, char>,
+}
+
+impl Default for FutharkKeyboardAliases {
+    fn default() -> Self {
+        let mut alias_to_rune = HashMap::new();
+
+        alias_to_rune.insert('q', 'A');
+        alias_to_rune.insert('Q', 'A');
+        alias_to_rune.insert('y', 'T');
+        alias_to_rune.insert('Y', 'T');
+        alias_to_rune.insert('x', 'S');
+        alias_to_rune.insert('X', 'S');
+        alias_to_rune.insert('c', 'N');
+        alias_to_rune.insert('C', 'N');
+
+        Self { alias_to_rune }
+    }
+}
+
+impl FutharkKeyboardAliases {
+    pub fn map_alias(&self, key: char) -> Option<char> {
+        self.alias_to_rune.get(&key).copied()
+    }
+
+    pub fn set_alias(&mut self, alias: char, rune: char) {
+        self.alias_to_rune.insert(alias, rune);
+    }
+}
+
 #[derive(Resource, Default)]
 pub struct PrebakedFutharkAudio {
     pub handles_by_index: Vec<Vec<Handle<crate::audio::ProcessedAudio>>>,
@@ -120,8 +155,19 @@ pub struct PrebakedFutharkConversationalAudio {
 pub fn configure_futhark_keyboard(app: &mut App) {
     app.init_resource::<FutharkKeyboardLegendMode>();
     app.init_resource::<FutharkKeyboardAnimationSpeed>();
+    app.init_resource::<FutharkKeyboardAliases>();
     app.add_message::<TypedFutharkInput>();
     app.add_message::<FutharkKeyboardCommand>();
+}
+
+fn map_typed_char_to_futhark(letter: char, aliases: &FutharkKeyboardAliases) -> Option<char> {
+    if letter_to_index(letter).is_some() {
+        return Some(letter);
+    }
+
+    aliases
+        .map_alias(letter)
+        .filter(|mapped| letter_to_index(*mapped).is_some())
 }
 
 fn is_vowel(letter: char) -> bool {
@@ -147,7 +193,7 @@ pub fn bake_futhark_letter(
     processed_audios: &mut Assets<crate::audio::ProcessedAudio>,
 ) -> Vec<Handle<crate::audio::ProcessedAudio>> {
     let Some(raw) = game_assets.futhark_sounds.get(letter_index) else {
-        return Vec::new();
+        panic!("invalid futhark letter index");
     };
     let Some(source) = audio_sources.get(&raw.clone().typed::<AudioSource>()) else {
         return Vec::new();
@@ -274,7 +320,7 @@ pub fn spawn_futhark_keyboard(mut commands: Commands, game_assets: Res<GameAsset
                                     key_parent.spawn((
                                         Node {
                                             position_type: PositionType::Absolute,
-                                            width: Val::Px(80.0),
+                                            width: Val::Px(48.0),
                                             height: Val::Px(48.0),
                                             ..default()
                                         },
@@ -286,22 +332,36 @@ pub fn spawn_futhark_keyboard(mut commands: Commands, game_assets: Res<GameAsset
                                             },
                                         ),
                                         FutharkKeyBackground {
-                                            base_color: Color::srgb(0.85, 0.85, 0.85),
+                                            base_color: Color::WHITE,
                                         },
                                     ));
-
                                     key_parent.spawn((
-                                        Text::new("TAB"),
-                                        TextFont {
-                                            font_size: 20.0,
+                                        Node {
+                                            width: Val::Px(32.0),
+                                            height: Val::Px(32.0),
                                             ..default()
                                         },
-                                        TextColor(Color::BLACK),
+                                        ImageNode::from_atlas_image(
+                                            game_assets.futhark.clone(),
+                                            TextureAtlas {
+                                                layout: game_assets.futhark_layout.clone(),
+                                                index: SPRITE_TAB_ACTION,
+                                            },
+                                        ),
                                     ));
                                 });
                         }
 
                         for &index in row {
+                            if index == usize::MAX {
+                                row_parent.spawn(Node {
+                                    width: Val::Px(48.0),
+                                    height: Val::Px(48.0),
+                                    ..default()
+                                });
+                                continue;
+                            }
+
                             let letter = index_to_letter(index).expect("valid futhark index");
 
                             row_parent
@@ -372,7 +432,7 @@ pub fn spawn_futhark_keyboard(mut commands: Commands, game_assets: Res<GameAsset
                                 });
                         }
 
-                        if row_index == 0 {
+                        if row_index == 2 {
                             row_parent
                                 .spawn((
                                     Button,
@@ -394,7 +454,7 @@ pub fn spawn_futhark_keyboard(mut commands: Commands, game_assets: Res<GameAsset
                                     key_parent.spawn((
                                         Node {
                                             position_type: PositionType::Absolute,
-                                            width: Val::Px(80.0),
+                                            width: Val::Px(48.0),
                                             height: Val::Px(48.0),
                                             ..default()
                                         },
@@ -406,17 +466,22 @@ pub fn spawn_futhark_keyboard(mut commands: Commands, game_assets: Res<GameAsset
                                             },
                                         ),
                                         FutharkKeyBackground {
-                                            base_color: Color::srgb(0.85, 0.85, 0.85),
+                                            base_color: Color::WHITE,
                                         },
                                     ));
-
                                     key_parent.spawn((
-                                        Text::new("BKSP"),
-                                        TextFont {
-                                            font_size: 16.0,
+                                        Node {
+                                            width: Val::Px(32.0),
+                                            height: Val::Px(32.0),
                                             ..default()
                                         },
-                                        TextColor(Color::BLACK),
+                                        ImageNode::from_atlas_image(
+                                            game_assets.futhark.clone(),
+                                            TextureAtlas {
+                                                layout: game_assets.futhark_layout.clone(),
+                                                index: SPRITE_BACKSPACE_ACTION,
+                                            },
+                                        ),
                                     ));
                                 });
                         }
@@ -445,6 +510,7 @@ pub fn emit_futhark_keyboard_command_from_clicks(
 
 pub fn emit_typed_futhark_input_from_keyboard(
     mut keyboard_input: MessageReader<KeyboardInput>,
+    aliases: Res<FutharkKeyboardAliases>,
     mut typed_futhark_input: MessageWriter<TypedFutharkInput>,
 ) {
     for event in keyboard_input.read() {
@@ -457,7 +523,9 @@ pub fn emit_typed_futhark_input_from_keyboard(
         };
 
         for c in text.chars() {
-            typed_futhark_input.write(TypedFutharkInput(c));
+            if let Some(mapped) = map_typed_char_to_futhark(c, &aliases) {
+                typed_futhark_input.write(TypedFutharkInput(mapped));
+            }
         }
     }
 }
@@ -476,7 +544,7 @@ pub fn emit_typed_futhark_input_from_keyboard_clicks(
 }
 
 pub fn sync_futhark_key_hover(
-    buttons: Query<(&Interaction, &Children), (Changed<Interaction>, With<FutharkKeyboardButton>)>,
+    buttons: Query<(&Interaction, &Children), (Changed<Interaction>, With<FutharkKeyButton>)>,
     mut backgrounds: Query<(&mut ImageNode, &FutharkKeyBackground)>,
 ) {
     for (interaction, children) in &buttons {
@@ -619,5 +687,25 @@ mod tests {
     #[test]
     fn highlights_uppercase_vowels_in_green() {
         assert_eq!(key_background_color('A'), Color::srgb(0.55, 0.82, 0.55));
+    }
+
+    #[test]
+    fn positional_aliases_map_to_uppercase_runes() {
+        let aliases = FutharkKeyboardAliases::default();
+
+        assert_eq!(map_typed_char_to_futhark('q', &aliases), Some('A'));
+        assert_eq!(map_typed_char_to_futhark('Q', &aliases), Some('A'));
+        assert_eq!(map_typed_char_to_futhark('y', &aliases), Some('T'));
+        assert_eq!(map_typed_char_to_futhark('x', &aliases), Some('S'));
+        assert_eq!(map_typed_char_to_futhark('c', &aliases), Some('N'));
+    }
+
+    #[test]
+    fn direct_rune_letter_input_still_works() {
+        let aliases = FutharkKeyboardAliases::default();
+
+        assert_eq!(map_typed_char_to_futhark('a', &aliases), Some('a'));
+        assert_eq!(map_typed_char_to_futhark('A', &aliases), Some('A'));
+        assert_eq!(map_typed_char_to_futhark('z', &aliases), Some('z'));
     }
 }

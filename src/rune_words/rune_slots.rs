@@ -244,12 +244,13 @@ pub fn handle_backspace_in_rune_slots(
     mut active_slot: ResMut<ActiveRuneSlot>,
     mut slots: Query<(&mut RuneSlot, Option<&RuneSlotLinks>)>,
 ) {
-    let backspace_pressed = keyboard_input
+    let backspace_pressed = keyboard_input.read().any(|ev| {
+        ev.state == ButtonState::Pressed && ev.key_code == KeyCode::Backspace
+            || ev.key_code == KeyCode::Delete
+            || ev.key_code == KeyCode::Comma // Positional standin for OSK.
+    }) || keyboard_commands
         .read()
-        .any(|ev| ev.state == ButtonState::Pressed && ev.key_code == KeyCode::Backspace)
-        || keyboard_commands
-            .read()
-            .any(|command| command.0 == futhark::FutharkKeyboardCommandType::Backspace);
+        .any(|command| command.0 == futhark::FutharkKeyboardCommandType::Backspace);
 
     if !backspace_pressed {
         return;

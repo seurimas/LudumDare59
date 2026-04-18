@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 use super::params::SoundParams;
 
-/// JSON asset: a 24-element array (one per futhark letter in LETTERS order),
+/// JSON asset: a 25-element array (one per futhark letter in LETTERS order),
 /// each element an array of one or more SoundParams variants.
 /// When a key is pressed, one variant is chosen at random.
 #[derive(Asset, TypePath, Deserialize)]

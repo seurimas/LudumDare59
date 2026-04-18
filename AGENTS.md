@@ -20,7 +20,7 @@ cargo run --bin uat_shows_loading_rune_reveal
 
 If the UAT exits with status 0, then that means I have approved the state of the UAT! Good job! If not, ask about what can be done to improve things.
 
-NEVER kill a UAT. Expect that it may take some time to verify.
+NEVER kill a UAT test. Expect that it may take some time to verify. I repeat, DO NOT KILL A TERMINAL RUNNING A UAT.
 
 ## Pre-work checklist
 
