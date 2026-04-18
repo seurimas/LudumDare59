@@ -52,6 +52,8 @@ pub struct GameAssets {
     pub futhark_sounds: Vec<UntypedHandle>,
     #[asset(path = "sound/params.json")]
     pub futhark_sound_params: Handle<audio_params::FutharkSoundConfig>,
+    #[asset(path = "sound/conversational_params.json")]
+    pub futhark_conversational_params: Handle<audio_params::FutharkSoundConfig>,
 }
 
 pub fn configure_app(app: &mut App) {

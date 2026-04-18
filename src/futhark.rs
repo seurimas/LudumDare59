@@ -90,10 +90,8 @@ pub fn play_futhark_key_sound(
 
         let config = sound_configs.get(&game_assets.futhark_sound_params);
         let params = crate::audio_params::pick_params(config, index);
-        let handle = processed_audios.add(crate::audio_params::ProcessedAudio {
-            bytes: source.bytes.clone(),
-            params,
-        });
+        let audio = crate::audio_params::process_audio(&source.bytes, &params);
+        let handle = processed_audios.add(audio);
         commands.spawn(AudioPlayer::<crate::audio_params::ProcessedAudio>(handle));
     }
 }

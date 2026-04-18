@@ -9,7 +9,6 @@ use bevy::audio::Decodable;
 use bevy::prelude::*;
 use rand::Rng;
 use rodio::Source;
-use rodio::source::{Amplify, Delay, FadeIn, SamplesConverter, SkipDuration, Speed, TakeDuration};
 use serde::Deserialize;
 
 /// Parameters for a single reverb preset.
@@ -19,7 +18,7 @@ use serde::Deserialize;
 pub struct ReverbParams {
     /// Delay length in seconds (controls perceived room size). Default 0.1.
     pub room_size: f32,
-    /// Feedback decay per reflection (0.0 = no echo, <1.0 required for stability). Default 0.5.
+    /// Feedback decay per reflection (0.0 = instant decay, <1.0 required for stability). Default 0.5.
     pub decay: f32,
     /// Wet/dry mix (0.0 = dry, 1.0 = full reverb). Default 0.3.
     pub wet: f32,
@@ -35,73 +34,11 @@ impl Default for ReverbParams {
     }
 }
 
-/// A rodio Source that applies a feedback comb-filter reverb to another source.
-pub struct ReverbSource<S: Source<Item = f32>> {
-    inner: S,
-    buffer: Vec<f32>,
-    pos: usize,
-    decay: f32,
-    wet: f32,
-}
-
-impl<S: Source<Item = f32>> ReverbSource<S> {
-    pub fn new(inner: S, params: &ReverbParams) -> Self {
-        let sample_rate = inner.sample_rate();
-        let channels = inner.channels() as usize;
-        // Align delay length to a whole number of frames so L/R channels stay paired.
-        let delay_frames = ((params.room_size * sample_rate as f32) as usize).max(1);
-        let buffer_len = delay_frames * channels;
-        Self {
-            inner,
-            buffer: vec![0.0; buffer_len],
-            pos: 0,
-            decay: params.decay,
-            wet: params.wet,
-        }
-    }
-}
-
-impl<S: Source<Item = f32>> Iterator for ReverbSource<S> {
-    type Item = f32;
-
-    fn next(&mut self) -> Option<f32> {
-        let input = self.inner.next()?;
-        let delayed = self.buffer[self.pos];
-        // Feedback comb filter: y[n] = x[n] + decay * y[n-delay]
-        let feedback = input + self.decay * delayed;
-        self.buffer[self.pos] = feedback;
-        self.pos = (self.pos + 1) % self.buffer.len();
-        // Mix dry signal with the reverb tail
-        Some(input + self.decay * delayed * self.wet)
-    }
-}
-
-impl<S: Source<Item = f32>> Source for ReverbSource<S> {
-    fn current_frame_len(&self) -> Option<usize> {
-        self.inner.current_frame_len()
-    }
-
-    fn channels(&self) -> u16 {
-        self.inner.channels()
-    }
-
-    fn sample_rate(&self) -> u32 {
-        self.inner.sample_rate()
-    }
-
-    fn total_duration(&self) -> Option<Duration> {
-        // Reverb adds a tail, so total duration is unbounded.
-        None
-    }
-}
-
 /// Parameters for a single playback of a futhark sound.
 /// All fields have sane defaults so partial JSON entries are valid.
 #[derive(Deserialize, Clone, Debug)]
 #[serde(default)]
 pub struct SoundParams {
-    /// Playback speed multiplier. Also changes pitch. Default 1.0.
-    pub speed: f32,
     /// Volume multiplier. Default 1.0.
     pub volume: f32,
     /// Fade-in duration in milliseconds. Default 0.
@@ -110,8 +47,15 @@ pub struct SoundParams {
     pub delay_ms: u64,
     /// Skip this many milliseconds from the start of the audio data. Default 0.
     pub skip_ms: u64,
-    /// Truncate playback after this many milliseconds. Omit for no limit.
-    pub take_ms: Option<u64>,
+    /// Target playback duration in milliseconds. 0 means play as-is.
+    /// - Samples longer than this are truncated with a 100ms fade-out at the cut point.
+    /// - Samples shorter than this are echoed (repeated at decaying volume) to fill the duration,
+    ///   unless `conversational` is true.
+    pub duration_ms: u64,
+    /// Volume multiplier applied to each successive echo repeat. Default 0.5.
+    pub echo_decay: f32,
+    /// If true, shorter samples play as-is (no echo) and longer samples still fade at cut. Default false.
+    pub conversational: bool,
     /// Array of reverb presets to choose from at random. Empty means no reverb.
     pub reverb: Vec<ReverbParams>,
     /// Resolved reverb chosen by pick_params. Not deserialized from JSON.
@@ -122,12 +66,13 @@ pub struct SoundParams {
 impl Default for SoundParams {
     fn default() -> Self {
         Self {
-            speed: 1.0,
             volume: 1.0,
             fade_in_ms: 0,
             delay_ms: 0,
             skip_ms: 0,
-            take_ms: None,
+            duration_ms: 0,
+            echo_decay: 0.5,
+            conversational: false,
             reverb: Vec::new(),
             selected_reverb: None,
         }
@@ -193,55 +138,173 @@ impl From<serde_json::Error> for FutharkSoundConfigError {
     }
 }
 
-/// A single playback-ready audio asset: raw bytes plus resolved parameters.
-/// Created at play-time by combining a loaded AudioSource with a SoundParams.
+/// A fully pre-processed audio asset ready for playback.
+/// All effects (duration normalisation, echo, fade, reverb) are baked into `samples`.
 #[derive(Asset, TypePath)]
 pub struct ProcessedAudio {
-    pub bytes: Arc<[u8]>,
-    pub params: SoundParams,
+    pub samples: Arc<[f32]>,
+    pub channels: u16,
+    pub sample_rate: u32,
 }
 
-type InnerDecoder = rodio::Decoder<Cursor<Arc<[u8]>>>;
-type ProcessedDecoder = ReverbSource<
-    Delay<FadeIn<TakeDuration<SkipDuration<Speed<Amplify<SamplesConverter<InnerDecoder, f32>>>>>>>,
->;
+/// A simple iterator that plays back a pre-processed sample buffer.
+pub struct SamplesDecoder {
+    samples: Arc<[f32]>,
+    pos: usize,
+    channels: u16,
+    sample_rate: u32,
+}
 
-impl Decodable for ProcessedAudio {
-    type DecoderItem = f32;
-    type Decoder = ProcessedDecoder;
+impl Iterator for SamplesDecoder {
+    type Item = f32;
 
-    fn decoder(&self) -> Self::Decoder {
-        let p = &self.params;
-        // None means "play to end"; use a duration that exceeds any sound file.
-        let take = p
-            .take_ms
-            .map(Duration::from_millis)
-            .unwrap_or(Duration::from_secs(86400));
-
-        // rodio's FadeIn asserts duration > 0; use 1ns floor so zero means "instant".
-        let fade_in = Duration::from_millis(p.fade_in_ms).max(Duration::from_nanos(1));
-
-        let chain = rodio::Decoder::new(Cursor::new(self.bytes.clone()))
-            .expect("valid ogg bytes")
-            .convert_samples::<f32>()
-            .amplify(p.volume)
-            .speed(p.speed)
-            .skip_duration(Duration::from_millis(p.skip_ms))
-            .take_duration(take)
-            .fade_in(fade_in)
-            .delay(Duration::from_millis(p.delay_ms));
-
-        let reverb = p.selected_reverb.as_ref().cloned().unwrap_or(ReverbParams {
-            wet: 0.0,
-            ..Default::default()
-        });
-        ReverbSource::new(chain, &reverb)
+    fn next(&mut self) -> Option<f32> {
+        if self.pos < self.samples.len() {
+            let s = self.samples[self.pos];
+            self.pos += 1;
+            Some(s)
+        } else {
+            None
+        }
     }
 }
 
-/// Pick a variant from the config for the given rune index.
-/// Chooses uniformly at random when multiple variants are present.
-/// Also resolves a single reverb preset from the variant's reverb array.
+impl Source for SamplesDecoder {
+    fn current_frame_len(&self) -> Option<usize> {
+        Some(self.samples.len().saturating_sub(self.pos))
+    }
+
+    fn channels(&self) -> u16 {
+        self.channels
+    }
+
+    fn sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+
+    fn total_duration(&self) -> Option<Duration> {
+        let frames = self.samples.len() / self.channels as usize;
+        Some(Duration::from_secs_f32(
+            frames as f32 / self.sample_rate as f32,
+        ))
+    }
+}
+
+impl Decodable for ProcessedAudio {
+    type DecoderItem = f32;
+    type Decoder = SamplesDecoder;
+
+    fn decoder(&self) -> Self::Decoder {
+        SamplesDecoder {
+            samples: self.samples.clone(),
+            pos: 0,
+            channels: self.channels,
+            sample_rate: self.sample_rate,
+        }
+    }
+}
+
+// ── helpers ─────────────────────────────────────────────────────────────────
+
+fn ms_to_sample_count(ms: u64, sample_rate: u32, channels: u16) -> usize {
+    (ms as f32 / 1000.0 * sample_rate as f32) as usize * channels as usize
+}
+
+/// Apply a feedback comb-filter reverb in-place.
+fn apply_reverb(samples: &mut [f32], params: &ReverbParams, sample_rate: u32, channels: u16) {
+    let delay_frames = ((params.room_size * sample_rate as f32) as usize).max(1);
+    let buffer_len = delay_frames * channels as usize;
+    let mut buffer = vec![0.0f32; buffer_len];
+    let mut pos = 0usize;
+
+    for s in samples.iter_mut() {
+        let input = *s;
+        let delayed = buffer[pos];
+        let feedback = input + params.decay * delayed;
+        buffer[pos] = feedback;
+        pos = (pos + 1) % buffer_len;
+        *s = input + params.decay * delayed * params.wet;
+    }
+}
+
+// ── public processing entry point ────────────────────────────────────────────
+
+/// Decode raw audio bytes and apply all effects specified by `params`.
+/// Returns a `ProcessedAudio` ready to be added to the bevy asset store.
+pub fn process_audio(bytes: &Arc<[u8]>, params: &SoundParams) -> ProcessedAudio {
+    let decoder = rodio::Decoder::new(Cursor::new(bytes.clone())).expect("valid audio bytes");
+    let channels = decoder.channels();
+    let sample_rate = decoder.sample_rate();
+
+    // Collect all raw samples as f32
+    let all: Vec<f32> = decoder.convert_samples().collect();
+
+    // Skip + volume
+    let skip = ms_to_sample_count(params.skip_ms, sample_rate, channels);
+    let mut samples: Vec<f32> = all[skip.min(all.len())..]
+        .iter()
+        .map(|&s| s * params.volume)
+        .collect();
+
+    // Fade-in
+    if params.fade_in_ms > 0 {
+        let n = ms_to_sample_count(params.fade_in_ms, sample_rate, channels);
+        for i in 0..n.min(samples.len()) {
+            samples[i] *= i as f32 / n as f32;
+        }
+    }
+
+    // Duration normalisation
+    if params.duration_ms > 0 {
+        let target = ms_to_sample_count(params.duration_ms, sample_rate, channels);
+        let fade_len = ms_to_sample_count(100, sample_rate, channels); // 100ms fade-out
+
+        if samples.len() >= target {
+            // Longer sample: truncate with 100ms fade-out at the cut point
+            samples.truncate(target);
+            let fade_start = target.saturating_sub(fade_len);
+            for i in fade_start..target {
+                let t = (i - fade_start) as f32 / fade_len as f32;
+                samples[i] *= 1.0 - t;
+            }
+        } else if !params.conversational {
+            // Shorter sample: echo (repeat at decaying volume) until duration is satisfied.
+            // Spillover beyond `target` on the last echo is allowed.
+            let original = samples.clone();
+            let mut vol = params.echo_decay;
+            while samples.len() < target {
+                let echo: Vec<f32> = original.iter().map(|&s| s * vol).collect();
+                samples.extend_from_slice(&echo);
+                vol *= params.echo_decay;
+            }
+        }
+        // conversational + shorter than target: play as-is (no echo, no padding)
+    }
+
+    // Reverb
+    if let Some(reverb) = &params.selected_reverb {
+        apply_reverb(&mut samples, reverb, sample_rate, channels);
+    }
+
+    // Delay (silence before the sound)
+    if params.delay_ms > 0 {
+        let n = ms_to_sample_count(params.delay_ms, sample_rate, channels);
+        let mut delayed = vec![0.0f32; n];
+        delayed.extend_from_slice(&samples);
+        samples = delayed;
+    }
+
+    ProcessedAudio {
+        samples: samples.into(),
+        channels,
+        sample_rate,
+    }
+}
+
+// ── variant selection ────────────────────────────────────────────────────────
+
+/// Pick a random variant from the config for the given rune index and resolve
+/// the reverb selection. Returns a fully-resolved `SoundParams`.
 pub fn pick_params(config: Option<&FutharkSoundConfig>, index: usize) -> SoundParams {
     let variants = config
         .and_then(|c| c.0.get(index))
@@ -253,12 +316,10 @@ pub fn pick_params(config: Option<&FutharkSoundConfig>, index: usize) -> SoundPa
         Some(v) => v[rand::thread_rng().gen_range(0..v.len())].clone(),
     };
 
-    params.selected_reverb = if params.reverb.is_empty() {
-        None
-    } else if params.reverb.len() == 1 {
-        Some(params.reverb[0].clone())
-    } else {
-        Some(params.reverb[rand::thread_rng().gen_range(0..params.reverb.len())].clone())
+    params.selected_reverb = match params.reverb.len() {
+        0 => None,
+        1 => Some(params.reverb[0].clone()),
+        n => Some(params.reverb[rand::thread_rng().gen_range(0..n)].clone()),
     };
 
     params
