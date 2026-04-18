@@ -50,6 +50,7 @@ fn handle_acceptance_keys(input: Res<ButtonInput<KeyCode>>, test: Res<Acceptance
         std::process::exit(0);
     }
     if input.just_pressed(KeyCode::F2) {
+        // The user has indicated that the test has failed for some reason. You must ask them to provide details.
         std::process::exit(test.test_id as i32);
     }
 }

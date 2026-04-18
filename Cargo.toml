@@ -37,5 +37,13 @@ name = "uat_shows_rune_word_navigation"
 path = "tests/acceptance/shows_rune_word_navigation.rs"
 
 [[bin]]
-name = "uat_shows_battle_rune_word"
-path = "tests/acceptance/shows_battle_rune_word.rs"
+name = "uat_shows_binding_battle_state"
+path = "tests/acceptance/shows_binding_battle_state.rs"
+
+[[bin]]
+name = "uat_shows_acting_battle_state"
+path = "tests/acceptance/shows_acting_battle_state.rs"
+
+[[bin]]
+name = "uat_shows_reacting_battle_state"
+path = "tests/acceptance/shows_reacting_battle_state.rs"

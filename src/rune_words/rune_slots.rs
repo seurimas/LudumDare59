@@ -66,7 +66,7 @@ pub struct ActiveRuneSlot {
 }
 
 #[derive(Message, Default)]
-pub struct PlayActiveRuneWordAudio;
+pub struct EnterActiveRuneWord;
 
 pub struct RuneSlotConfig {
     pub left: Val,
@@ -92,7 +92,7 @@ impl Default for RuneSlotConfig {
 
 pub fn configure_rune_slots(app: &mut App) {
     app.init_resource::<ActiveRuneSlot>();
-    app.add_message::<PlayActiveRuneWordAudio>();
+    app.add_message::<EnterActiveRuneWord>();
 }
 
 pub fn spawn_rune_slot(
@@ -269,7 +269,7 @@ pub fn handle_backspace_in_rune_slots(
 
 pub fn emit_play_active_rune_word_audio_on_enter(
     mut keyboard_input: MessageReader<KeyboardInput>,
-    mut play_events: MessageWriter<PlayActiveRuneWordAudio>,
+    mut play_events: MessageWriter<EnterActiveRuneWord>,
 ) {
     let enter_pressed = keyboard_input
         .read()
@@ -281,7 +281,7 @@ pub fn emit_play_active_rune_word_audio_on_enter(
 }
 
 pub fn play_active_rune_word_audio(
-    mut play_events: MessageReader<PlayActiveRuneWordAudio>,
+    mut play_events: MessageReader<EnterActiveRuneWord>,
     active_slot: Res<ActiveRuneSlot>,
     slots: Query<(&RuneSlot, Option<&RuneSlotLinks>)>,
     prebaked_audio: Option<Res<crate::futhark::PrebakedFutharkConversationalAudio>>,
@@ -791,7 +791,7 @@ mod tests {
 
         let reader = app
             .world_mut()
-            .resource_mut::<Messages<PlayActiveRuneWordAudio>>();
+            .resource_mut::<Messages<EnterActiveRuneWord>>();
         let mut cursor = reader.get_cursor();
         assert!(
             cursor.read(&reader).next().is_some(),
