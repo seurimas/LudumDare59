@@ -6,6 +6,7 @@ pub mod audio_params;
 pub mod dictionary;
 pub mod futhark;
 pub mod loading;
+pub mod rune_slots;
 
 #[derive(States, Default, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum GameState {
