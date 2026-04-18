@@ -18,6 +18,10 @@ Example:
 cargo run --bin uat_shows_loading_rune_reveal
 ```
 
+## Pre-work checklist
+
+Do `git log -3` before beginning work. This will highlight the most recent work and where progress is being made. This may help inform your current task, but do not assume it should if the link is not clear.
+
 ## Post-work checklist
 
 After completing ANY work, always run `cargo test`. Additionally, identify any new or changed UAT tests. Run them with `cargo run --bin <name>` and expect a zero output. If you get a non-zero output, use AskUserQuestion or similar tool to ask what went wrong and iterate on their feedback.
