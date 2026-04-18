@@ -26,4 +26,21 @@ Then, report on the results to the user.
 
 ## Important bevy 0.18 things
 
-Old bevy had `add_startup_system`. Now, you `add_system(Startup, <system>)`.
+- Old bevy had `add_startup_system`. Now, you `add_systems(Startup, <system>)`.
+- State lifecycle hooks: `add_systems(OnEnter(State::Variant), ...)` and `add_systems(OnExit(State::Variant), ...)`.
+- Register states with `app.init_state::<MyState>()`.
+- `TextureAtlasLayout::from_grid` takes `UVec2`, not `Vec2` (e.g. `UVec2::splat(32)`).
+- `despawn()` in bevy 0.18 despawns the entity and its children by default.
+- `TextFont` is the component for font settings on `Text` nodes (not `TextStyle`).
+
+## Asset loading preferences
+
+- Always use `bevy_asset_loader` (crate version 0.26 for bevy 0.18) for loading assets. Do not manually poll `AssetServer::is_loaded_with_dependencies`.
+- Derive `AssetCollection, Resource` on the assets struct and annotate fields with `#[asset(...)]` attributes.
+- Use `#[asset(texture_atlas_layout(tile_size_x = N, tile_size_y = N, columns = C, rows = R))]` for atlas layouts — no separate manual construction needed.
+
+## Code organisation preferences
+
+- Keep asset loading in its own module: `src/loading.rs` with a `pub fn configure_loading(app: &mut App)` entry point.
+- Separate `configure_app` (global settings like `ClearColor`) from `configure_loading` (state machine + asset pipeline).
+- UAT-specific setup (e.g. spawning test sprites) must live inside the UAT binary, not in the game library. The library's `OnEnter(GameState::Ready)` should be left empty unless it is real game logic.

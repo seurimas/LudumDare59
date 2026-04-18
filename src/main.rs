@@ -1,5 +1,5 @@
+use LudumDare59::{configure_app, configure_loading};
 use bevy::prelude::*;
-use LudumDare59::configure_app;
 
 #[cfg(test)]
 use bevy::time::TimeUpdateStrategy;
@@ -10,6 +10,7 @@ fn main() {
     let mut app = App::new();
     app.add_plugins(DefaultPlugins);
     configure_app(&mut app);
+    configure_loading(&mut app);
     app.run();
 }
 

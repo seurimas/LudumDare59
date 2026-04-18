@@ -27,3 +27,9 @@ Expected acceptance test flow:
 - The user runs the binary, visually inspects the result, and presses F1 (pass) or F2 (fail).
 - The process exit code communicates the result; a CI wrapper or the user can check `$LASTEXITCODE` / `$?`.
 - After the process exits, if the exit code is nonzero (F2 / fail), **immediately use the AskUserQuestion tool** to ask the user what went wrong. Iterate on their feedback until the UAT passes.
+
+### Module structure for new features
+
+- New systems belong in a dedicated module under `src/` (e.g. `src/loading.rs`, `src/combat.rs`).
+- Expose a single `pub fn configure_<feature>(app: &mut App)` entry point per module.
+- Register that function in `lib.rs` and call it from `main.rs`.
