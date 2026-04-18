@@ -2,9 +2,11 @@ use bevy::ecs::message::{MessageReader, MessageWriter};
 use bevy::prelude::*;
 
 use crate::dictionary::Futharkation;
-use crate::rune_words::battle_states::acting::{StartActing};
+use crate::rune_words::battle_states::acting::StartActing;
 use crate::rune_words::battle_states::binding::StartBinding;
-use crate::rune_words::battle_states::reacting::{ReactingFailed, ReactingSucceeded, StartReacting};
+use crate::rune_words::battle_states::reacting::{
+    ReactingFailed, ReactingSucceeded, StartReacting,
+};
 
 #[derive(Resource, Default)]
 pub struct WordBook {

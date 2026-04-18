@@ -21,10 +21,7 @@ fn main() {
 
     app.add_systems(OnEnter(GameState::Ready), spawn_futhark_keyboard);
     app.add_systems(OnEnter(GameState::Ready), setup_demo);
-    app.add_systems(
-        Update,
-        demo_controller.run_if(in_state(GameState::Ready)),
-    );
+    app.add_systems(Update, demo_controller.run_if(in_state(GameState::Ready)));
 
     acceptance::initialize_app(
         &mut app,
@@ -52,14 +49,11 @@ fn setup_demo(
 
     let words: Vec<dictionary::Futharkation> = [3usize, 4, 5, 3, 4]
         .iter()
-        .filter_map(|&len| {
-            dictionary::random_futharkation_with_rune_length(len, &mut rng).ok()
-        })
+        .filter_map(|&len| dictionary::random_futharkation_with_rune_length(len, &mut rng).ok())
         .collect();
 
-    let quicktime_word =
-        dictionary::random_futharkation_with_rune_length(4, &mut rng)
-            .unwrap_or_else(|_| words[0].clone());
+    let quicktime_word = dictionary::random_futharkation_with_rune_length(4, &mut rng)
+        .unwrap_or_else(|_| words[0].clone());
 
     speed.hue_degrees_per_second = 45.0;
 
@@ -79,9 +73,7 @@ fn setup_demo(
         final_sent: false,
     });
 
-    start_acting.write(StartActing {
-        targets: words,
-    });
+    start_acting.write(StartActing { targets: words });
 
     commands.spawn((
         Node {
@@ -124,7 +116,9 @@ fn demo_controller(
     mut state: ResMut<DemoState>,
     mut quicktime: MessageWriter<QuickTime>,
     mut final_challenge: MessageWriter<FinalChallenge>,
-    mut acting_succeeded: MessageReader<LudumDare59::rune_words::battle_states::acting::ActingSucceeded>,
+    mut acting_succeeded: MessageReader<
+        LudumDare59::rune_words::battle_states::acting::ActingSucceeded,
+    >,
 ) {
     state.elapsed += time.delta_secs();
 
