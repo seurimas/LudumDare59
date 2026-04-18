@@ -144,12 +144,20 @@ impl FutharkKeyboardAliases {
 
 #[derive(Resource, Default)]
 pub struct PrebakedFutharkAudio {
-    pub handles_by_index: Vec<Vec<Handle<crate::audio::ProcessedAudio>>>,
+    pub handles_by_index: Vec<Vec<Handle<AudioSource>>>,
 }
 
 #[derive(Resource, Default)]
 pub struct PrebakedFutharkConversationalAudio {
-    pub handles_by_index: Vec<Vec<Handle<crate::audio::ProcessedAudio>>>,
+    pub handles_by_index: Vec<Vec<Handle<AudioSource>>>,
+}
+
+/// Raw f32 sample buffers for every baked letter variant.
+/// Used mid-game when multiple letters need to be concatenated before playback.
+#[derive(Resource, Default)]
+pub struct BakedAudioSamples {
+    pub regular: Vec<Vec<crate::audio::ProcessedAudio>>,
+    pub conversational: Vec<Vec<crate::audio::ProcessedAudio>>,
 }
 
 pub fn configure_futhark_keyboard(app: &mut App) {
@@ -185,27 +193,39 @@ fn key_background_color(letter: char) -> Color {
     }
 }
 
+/// Bake all parameter variants for one futhark letter.
+///
+/// Returns:
+/// - `Vec<Handle<AudioSource>>` — WAV-encoded handles ready for `AudioPlayer`.
+/// - `Vec<ProcessedAudio>`     — raw f32 samples kept for mid-game concatenation.
 pub fn bake_futhark_letter(
     letter_index: usize,
     game_assets: &GameAssets,
-    audio_sources: &Assets<AudioSource>,
     config: Option<&crate::audio::FutharkSoundConfig>,
-    processed_audios: &mut Assets<crate::audio::ProcessedAudio>,
-) -> Vec<Handle<crate::audio::ProcessedAudio>> {
+    audio_assets: &mut Assets<AudioSource>,
+) -> (Vec<Handle<AudioSource>>, Vec<crate::audio::ProcessedAudio>) {
     let Some(raw) = game_assets.futhark_sounds.get(letter_index) else {
         panic!("invalid futhark letter index");
     };
-    let Some(source) = audio_sources.get(&raw.clone().typed::<AudioSource>()) else {
-        return Vec::new();
+    let Some(source) = audio_assets.get(&raw.clone().typed::<AudioSource>()) else {
+        return (Vec::new(), Vec::new());
     };
 
-    params_to_bake_for_index(config, letter_index)
-        .into_iter()
-        .map(|params| {
-            let processed = crate::audio::process_audio(&source.bytes, &params);
-            processed_audios.add(processed)
+    let processed_list: Vec<crate::audio::ProcessedAudio> =
+        params_to_bake_for_index(config, letter_index)
+            .into_iter()
+            .map(|params| crate::audio::process_audio(&source.bytes, &params))
+            .collect();
+
+    let handles: Vec<Handle<AudioSource>> = processed_list
+        .iter()
+        .map(|p| {
+            let wav = crate::audio::samples_to_wav(&p.samples, p.channels, p.sample_rate);
+            audio_assets.add(AudioSource { bytes: wav.into() })
         })
-        .collect()
+        .collect();
+
+    (handles, processed_list)
 }
 
 fn params_to_bake_for_index(
@@ -251,7 +271,10 @@ pub fn play_futhark_key_sound(
             let i = rand::thread_rng().gen_range(0..handles.len());
             handles[i].clone()
         };
-        commands.spawn(AudioPlayer::<crate::audio::ProcessedAudio>(handle));
+        commands.spawn((
+            AudioPlayer::<AudioSource>(handle),
+            PlaybackSettings::DESPAWN,
+        ));
     }
 }
 
@@ -665,6 +688,7 @@ mod tests {
         let mut all_indices = rows
             .iter()
             .flat_map(|row| row.iter().copied())
+            .filter(|&i| i != usize::MAX)
             .collect::<Vec<_>>();
         all_indices.sort_unstable();
 

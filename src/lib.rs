@@ -84,6 +84,10 @@ pub fn configure_app(app: &mut App) {
             .chain()
             .run_if(in_state(GameState::Ready)),
     );
+    app.add_systems(
+        Update,
+        rune_words::rune_slots::tick_word_audio_queue.run_if(in_state(GameState::Ready)),
+    );
 }
 
 pub fn configure_loading(app: &mut App) {

@@ -4,7 +4,8 @@ use bevy_asset_loader::prelude::*;
 use crate::GameAssets;
 use crate::GameState;
 use crate::futhark::{
-    PrebakedFutharkAudio, PrebakedFutharkConversationalAudio, bake_futhark_letter,
+    BakedAudioSamples, PrebakedFutharkAudio, PrebakedFutharkConversationalAudio,
+    bake_futhark_letter,
 };
 
 #[derive(Component)]
@@ -23,8 +24,10 @@ struct ProcessingRuneSlot {
 #[derive(Resource)]
 struct ProcessingQueue {
     next_letter: usize,
-    regular_handles: Vec<Vec<Handle<crate::audio::ProcessedAudio>>>,
-    conversational_handles: Vec<Vec<Handle<crate::audio::ProcessedAudio>>>,
+    regular_handles: Vec<Vec<Handle<AudioSource>>>,
+    conversational_handles: Vec<Vec<Handle<AudioSource>>>,
+    regular_samples: Vec<Vec<crate::audio::ProcessedAudio>>,
+    conversational_samples: Vec<Vec<crate::audio::ProcessedAudio>>,
 }
 
 impl Default for ProcessingQueue {
@@ -33,6 +36,8 @@ impl Default for ProcessingQueue {
             next_letter: 0,
             regular_handles: vec![Vec::new(); FUTHARK_LETTER_COUNT],
             conversational_handles: vec![Vec::new(); FUTHARK_LETTER_COUNT],
+            regular_samples: (0..FUTHARK_LETTER_COUNT).map(|_| Vec::new()).collect(),
+            conversational_samples: (0..FUTHARK_LETTER_COUNT).map(|_| Vec::new()).collect(),
         }
     }
 }
@@ -123,9 +128,8 @@ fn spawn_processing_screen(mut commands: Commands, game_assets: Res<GameAssets>)
 fn process_next_letter(
     mut queue: ResMut<ProcessingQueue>,
     game_assets: Res<GameAssets>,
-    audio_sources: Res<Assets<AudioSource>>,
     sound_configs: Res<Assets<crate::audio::FutharkSoundConfig>>,
-    mut processed_audios: ResMut<Assets<crate::audio::ProcessedAudio>>,
+    mut audio_assets: ResMut<Assets<AudioSource>>,
     mut slots: Query<(&mut ProcessingRuneSlot, &mut Sprite)>,
     mut next_state: ResMut<NextState<GameState>>,
     mut commands: Commands,
@@ -151,20 +155,19 @@ fn process_next_letter(
     let regular_config = sound_configs.get(&game_assets.futhark_sound_params);
     let conv_config = sound_configs.get(&game_assets.futhark_conversational_params);
 
-    queue.regular_handles[letter_index] = bake_futhark_letter(
+    let (reg_handles, reg_samples) = bake_futhark_letter(
         letter_index,
         &game_assets,
-        &audio_sources,
         regular_config,
-        &mut processed_audios,
+        &mut audio_assets,
     );
-    queue.conversational_handles[letter_index] = bake_futhark_letter(
-        letter_index,
-        &game_assets,
-        &audio_sources,
-        conv_config,
-        &mut processed_audios,
-    );
+    queue.regular_handles[letter_index] = reg_handles;
+    queue.regular_samples[letter_index] = reg_samples;
+
+    let (conv_handles, conv_samples) =
+        bake_futhark_letter(letter_index, &game_assets, conv_config, &mut audio_assets);
+    queue.conversational_handles[letter_index] = conv_handles;
+    queue.conversational_samples[letter_index] = conv_samples;
 
     queue.next_letter += 1;
 
@@ -175,6 +178,11 @@ fn process_next_letter(
         commands.insert_resource(PrebakedFutharkConversationalAudio {
             handles_by_index: queue.conversational_handles.clone(),
         });
+        // Move raw samples into a permanent resource for mid-game concatenation.
+        let mut baked = BakedAudioSamples::default();
+        std::mem::swap(&mut baked.regular, &mut queue.regular_samples);
+        std::mem::swap(&mut baked.conversational, &mut queue.conversational_samples);
+        commands.insert_resource(baked);
         next_state.set(GameState::Ready);
     }
 }

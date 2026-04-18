@@ -3,8 +3,7 @@ use bevy::ecs::message::MessageWriter;
 use bevy::input::ButtonState;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::prelude::*;
-use std::collections::HashSet;
-use std::sync::Arc;
+use std::collections::{HashSet, VecDeque};
 
 use crate::{GameAssets, futhark};
 
@@ -93,10 +92,72 @@ impl Default for RuneSlotConfig {
     }
 }
 
+/// Queued word audio playback — the first handle is spawned immediately and subsequent
+/// handles play after each clip's duration has elapsed.
+#[derive(Resource, Default)]
+pub struct WordAudioQueue {
+    pending: VecDeque<(Handle<AudioSource>, f32)>,
+    elapsed: f32,
+    current_duration: f32,
+}
+
 pub fn configure_rune_slots(app: &mut App) {
     app.init_resource::<ActiveRuneSlot>();
+    app.init_resource::<WordAudioQueue>();
     app.add_message::<EnterActiveRuneWord>();
     app.add_message::<PlayFutharkLetters>();
+}
+
+/// Advance the word audio sequence each frame and spawn the next handle when the
+/// current clip has finished.
+pub fn tick_word_audio_queue(
+    mut queue: ResMut<WordAudioQueue>,
+    time: Res<Time>,
+    mut commands: Commands,
+) {
+    if queue.pending.is_empty() {
+        return;
+    }
+    queue.elapsed += time.delta_secs();
+    if queue.elapsed >= queue.current_duration {
+        if let Some((handle, duration)) = queue.pending.pop_front() {
+            commands.spawn((
+                AudioPlayer::<AudioSource>(handle),
+                PlaybackSettings::DESPAWN,
+            ));
+            queue.current_duration = duration;
+            queue.elapsed = 0.0;
+        }
+    }
+}
+
+/// Play the first handle immediately, queue the rest for sequential playback.
+fn start_audio_sequence(
+    handles_and_durations: impl IntoIterator<Item = (Handle<AudioSource>, f32)>,
+    queue: &mut WordAudioQueue,
+    commands: &mut Commands,
+) {
+    queue.pending.clear();
+    queue.elapsed = 0.0;
+    queue.current_duration = 0.0;
+
+    let mut iter = handles_and_durations.into_iter();
+    if let Some((first_handle, first_duration)) = iter.next() {
+        commands.spawn((
+            AudioPlayer::<AudioSource>(first_handle),
+            PlaybackSettings::DESPAWN,
+        ));
+        queue.current_duration = first_duration;
+    }
+    queue.pending.extend(iter);
+}
+
+/// Duration in seconds of a pre-processed clip.
+fn clip_duration(p: &crate::audio::ProcessedAudio) -> f32 {
+    if p.channels == 0 || p.sample_rate == 0 {
+        return 0.0;
+    }
+    p.samples.len() as f32 / (p.channels as f32 * p.sample_rate as f32)
 }
 
 pub fn spawn_rune_slot(
@@ -294,7 +355,8 @@ pub fn play_active_rune_word_audio(
     active_slot: Res<ActiveRuneSlot>,
     slots: Query<(&RuneSlot, Option<&RuneSlotLinks>)>,
     prebaked_audio: Option<Res<crate::futhark::PrebakedFutharkConversationalAudio>>,
-    mut processed_audio_assets: ResMut<Assets<crate::audio::ProcessedAudio>>,
+    baked_samples: Option<Res<crate::futhark::BakedAudioSamples>>,
+    mut queue: ResMut<WordAudioQueue>,
     mut commands: Commands,
 ) {
     if play_events.is_empty() {
@@ -306,64 +368,42 @@ pub fn play_active_rune_word_audio(
     let Some(prebaked_audio) = prebaked_audio else {
         return;
     };
+    let Some(baked_samples) = baked_samples else {
+        return;
+    };
 
     let Some(active_entity) = active_slot.entity else {
         return;
     };
 
-    let rune_indices = collect_word_rune_indices(active_entity, &slots);
-    if rune_indices.is_empty() {
-        return;
+    let entries: Vec<(Handle<AudioSource>, f32)> = collect_word_rune_indices(active_entity, &slots)
+        .into_iter()
+        .filter_map(|rune_index| {
+            let handle = prebaked_audio
+                .handles_by_index
+                .get(rune_index)
+                .and_then(|h| h.first())
+                .cloned()?;
+            let duration = baked_samples
+                .conversational
+                .get(rune_index)
+                .and_then(|v| v.first())
+                .map(clip_duration)
+                .unwrap_or(0.0);
+            Some((handle, duration))
+        })
+        .collect();
+
+    if !entries.is_empty() {
+        start_audio_sequence(entries, &mut queue, &mut commands);
     }
-
-    let mut combined_samples = Vec::new();
-    let mut channels = 0;
-    let mut sample_rate = 0;
-
-    for rune_index in rune_indices {
-        let Some(handle) = prebaked_audio
-            .handles_by_index
-            .get(rune_index)
-            .and_then(|handles| handles.first())
-        else {
-            continue;
-        };
-
-        let Some(processed) = processed_audio_assets.get(handle) else {
-            continue;
-        };
-
-        if channels == 0 {
-            channels = processed.channels;
-            sample_rate = processed.sample_rate;
-        }
-
-        if processed.channels != channels || processed.sample_rate != sample_rate {
-            continue;
-        }
-
-        combined_samples.extend_from_slice(&processed.samples);
-    }
-
-    if combined_samples.is_empty() {
-        return;
-    }
-
-    let concatenated_handle = processed_audio_assets.add(crate::audio::ProcessedAudio {
-        samples: Arc::<[f32]>::from(combined_samples),
-        channels,
-        sample_rate,
-    });
-
-    commands.spawn(AudioPlayer::<crate::audio::ProcessedAudio>(
-        concatenated_handle,
-    ));
 }
 
 pub fn play_futhark_letters_audio(
     mut play_events: MessageReader<PlayFutharkLetters>,
     prebaked_audio: Option<Res<crate::futhark::PrebakedFutharkConversationalAudio>>,
-    mut processed_audio_assets: ResMut<Assets<crate::audio::ProcessedAudio>>,
+    baked_samples: Option<Res<crate::futhark::BakedAudioSamples>>,
+    mut queue: ResMut<WordAudioQueue>,
     mut commands: Commands,
 ) {
     let Some(PlayFutharkLetters(letters)) = play_events.read().last().cloned() else {
@@ -373,42 +413,32 @@ pub fn play_futhark_letters_audio(
     let Some(prebaked_audio) = prebaked_audio else {
         return;
     };
-
-    let mut combined_samples: Vec<f32> = Vec::new();
-    let mut channels = 0u16;
-    let mut sample_rate = 0u32;
-
-    for rune_index in letters.chars().filter_map(crate::futhark::letter_to_index) {
-        let Some(handle) = prebaked_audio
-            .handles_by_index
-            .get(rune_index)
-            .and_then(|handles| handles.first())
-        else {
-            continue;
-        };
-        let Some(processed) = processed_audio_assets.get(handle) else {
-            continue;
-        };
-        if channels == 0 {
-            channels = processed.channels;
-            sample_rate = processed.sample_rate;
-        }
-        if processed.channels != channels || processed.sample_rate != sample_rate {
-            continue;
-        }
-        combined_samples.extend_from_slice(&processed.samples);
-    }
-
-    if combined_samples.is_empty() {
+    let Some(baked_samples) = baked_samples else {
         return;
-    }
+    };
 
-    let handle = processed_audio_assets.add(crate::audio::ProcessedAudio {
-        samples: Arc::<[f32]>::from(combined_samples),
-        channels,
-        sample_rate,
-    });
-    commands.spawn(AudioPlayer::<crate::audio::ProcessedAudio>(handle));
+    let entries: Vec<(Handle<AudioSource>, f32)> = letters
+        .chars()
+        .filter_map(crate::futhark::letter_to_index)
+        .filter_map(|rune_index| {
+            let handle = prebaked_audio
+                .handles_by_index
+                .get(rune_index)
+                .and_then(|h| h.first())
+                .cloned()?;
+            let duration = baked_samples
+                .conversational
+                .get(rune_index)
+                .and_then(|v| v.first())
+                .map(clip_duration)
+                .unwrap_or(0.0);
+            Some((handle, duration))
+        })
+        .collect();
+
+    if !entries.is_empty() {
+        start_audio_sequence(entries, &mut queue, &mut commands);
+    }
 }
 
 fn collect_word_rune_indices(
