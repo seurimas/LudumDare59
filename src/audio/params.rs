@@ -41,6 +41,9 @@ pub struct SoundParams {
     /// - Samples shorter than this are echoed (repeated at decaying volume) to fill the duration,
     ///   unless `conversational` is true.
     pub duration_ms: u64,
+    /// Pitch scaling factor. 1.0 is unchanged, 2.0 is one octave up, 0.5 is one octave down.
+    /// Implemented using phase-vocoder time-stretch + resampling.
+    pub pitch_scale: f32,
     /// Volume multiplier applied per repetition-length in the echo envelope. Default 0.5.
     pub echo_decay: f32,
     /// If true, shorter samples play as-is (no echo) and longer samples still fade at cut. Default false.
@@ -60,6 +63,7 @@ impl Default for SoundParams {
             delay_ms: 0,
             skip_ms: 0,
             duration_ms: 0,
+            pitch_scale: 1.0,
             echo_decay: 0.5,
             conversational: false,
             reverb: Vec::new(),
