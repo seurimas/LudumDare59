@@ -72,14 +72,29 @@ pub fn configure_futhark_keyboard(app: &mut App) {
 pub fn play_futhark_key_sound(
     mut typed_futhark_input: MessageReader<TypedFutharkInput>,
     game_assets: Res<crate::GameAssets>,
+    audio_sources: Res<Assets<AudioSource>>,
+    sound_configs: Res<Assets<crate::audio_params::FutharkSoundConfig>>,
+    mut processed_audios: ResMut<Assets<crate::audio_params::ProcessedAudio>>,
     mut commands: Commands,
 ) {
     for event in typed_futhark_input.read() {
-        if let Some(index) = letter_to_index(event.0) {
-            if let Some(handle) = game_assets.futhark_sounds.get(index) {
-                commands.spawn(AudioPlayer::new(handle.clone().typed::<AudioSource>()));
-            }
-        }
+        let Some(index) = letter_to_index(event.0) else {
+            continue;
+        };
+        let Some(raw) = game_assets.futhark_sounds.get(index) else {
+            continue;
+        };
+        let Some(source) = audio_sources.get(&raw.clone().typed::<AudioSource>()) else {
+            continue;
+        };
+
+        let config = sound_configs.get(&game_assets.futhark_sound_params);
+        let params = crate::audio_params::pick_params(config, index);
+        let handle = processed_audios.add(crate::audio_params::ProcessedAudio {
+            bytes: source.bytes.clone(),
+            params,
+        });
+        commands.spawn(AudioPlayer::<crate::audio_params::ProcessedAudio>(handle));
     }
 }
 
