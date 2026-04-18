@@ -39,6 +39,7 @@ fn main() {
             futhark::emit_typed_futhark_input_from_keyboard_clicks,
             futhark::sync_futhark_key_hover,
             futhark::animate_futhark_keyboard_colors,
+            futhark::play_futhark_key_sound,
             update_typed_rune,
             handle_speed_buttons,
             sync_speed_label,

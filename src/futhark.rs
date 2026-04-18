@@ -69,6 +69,20 @@ pub fn configure_futhark_keyboard(app: &mut App) {
     app.add_message::<TypedFutharkInput>();
 }
 
+pub fn play_futhark_key_sound(
+    mut typed_futhark_input: MessageReader<TypedFutharkInput>,
+    game_assets: Res<crate::GameAssets>,
+    mut commands: Commands,
+) {
+    for event in typed_futhark_input.read() {
+        if let Some(index) = letter_to_index(event.0) {
+            if let Some(handle) = game_assets.futhark_sounds.get(index) {
+                commands.spawn(AudioPlayer::new(handle.clone().typed::<AudioSource>()));
+            }
+        }
+    }
+}
+
 pub fn index_to_letter(index: usize) -> Option<char> {
     LETTERS.get(index).copied()
 }

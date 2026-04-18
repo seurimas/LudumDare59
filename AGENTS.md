@@ -24,7 +24,7 @@ Do `git log -3` before beginning work. This will highlight the most recent work 
 
 ## Post-work checklist
 
-After completing ANY work, always run `cargo test`. Additionally, identify any new or changed UAT tests. Run them with `cargo run --bin <name>` and expect a zero output. If you get a non-zero output, use AskUserQuestion or similar tool to ask what went wrong and iterate on their feedback.
+After completing ANY work, always run `cargo test`. Additionally, identify any new or changed UAT tests. Run them with `cargo run --bin <name>` and expect a zero output. YOU must run the UAT when it is appropriate to do so. If you get a non-zero output, use AskUserQuestion or similar tool to ask what went wrong and iterate on their feedback.
 
 Verify that your changes have not introduced new problems. When that is complete, go ahead and do all of the following:
 
@@ -56,3 +56,7 @@ Then, report on the results to the user.
 - Keep asset loading in its own module: `src/loading.rs` with a `pub fn configure_loading(app: &mut App)` entry point.
 - Separate `configure_app` (global settings like `ClearColor`) from `configure_loading` (state machine + asset pipeline).
 - UAT-specific setup (e.g. spawning test sprites) must live inside the UAT binary, not in the game library. The library's `OnEnter(GameState::Ready)` should be left empty unless it is real game logic.
+
+## Commit messages
+
+Keep commit messages short (one line). Do not sign with a co-author tag or your name.

@@ -19,6 +19,34 @@ pub struct GameAssets {
     pub futhark: Handle<Image>,
     #[asset(texture_atlas_layout(tile_size_x = 32, tile_size_y = 32, columns = 16, rows = 16))]
     pub futhark_layout: Handle<TextureAtlasLayout>,
+    // Ordered by futhark::LETTERS: f u 7 a r k g w h n i j A p z s t b e m l N d o
+    #[asset(paths(
+        "sound/f.ogg",
+        "sound/u.ogg",
+        "sound/7.ogg",
+        "sound/a.ogg",
+        "sound/r.ogg",
+        "sound/k.ogg",
+        "sound/g.ogg",
+        "sound/w.ogg",
+        "sound/h.ogg",
+        "sound/n.ogg",
+        "sound/i.ogg",
+        "sound/j.ogg",
+        "sound/A-2.ogg",
+        "sound/p.ogg",
+        "sound/z.ogg",
+        "sound/s.ogg",
+        "sound/t.ogg",
+        "sound/b.ogg",
+        "sound/e.ogg",
+        "sound/m.ogg",
+        "sound/l.ogg",
+        "sound/N-2.ogg",
+        "sound/d.ogg",
+        "sound/o.ogg"
+    ))]
+    pub futhark_sounds: Vec<UntypedHandle>,
 }
 
 pub fn configure_app(app: &mut App) {
