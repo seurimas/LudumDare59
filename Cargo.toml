@@ -30,3 +30,7 @@ path = "tests/acceptance/shows_typed_futhark_rune.rs"
 [[bin]]
 name = "uat_shows_rune_slots"
 path = "tests/acceptance/shows_rune_slots.rs"
+
+[[bin]]
+name = "uat_shows_rune_word_navigation"
+path = "tests/acceptance/shows_rune_word_navigation.rs"
