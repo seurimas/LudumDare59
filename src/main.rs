@@ -8,7 +8,14 @@ use std::time::Duration;
 
 fn main() {
     let mut app = App::new();
-    app.add_plugins(DefaultPlugins);
+    app.add_plugins(DefaultPlugins.set(WindowPlugin {
+        primary_window: Some(Window {
+            title: "LudumDare59".into(),
+            resolution: bevy::window::WindowResolution::new(1280_u32, 960_u32),
+            ..default()
+        }),
+        ..default()
+    }));
     configure_app(&mut app);
     configure_battle(&mut app);
     configure_loading(&mut app);

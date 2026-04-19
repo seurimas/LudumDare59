@@ -56,6 +56,7 @@ pub fn configure_loading(app: &mut App) {
                 .load_collection::<GameAssets>(),
         )
         .add_systems(Startup, setup_camera)
+        .add_systems(PostStartup, trigger_initial_aspect_ratio)
         .add_systems(OnEnter(GameState::Loading), spawn_loading_screen)
         .add_systems(OnExit(GameState::Loading), despawn_loading_screen)
         .add_systems(OnEnter(GameState::Processing), spawn_processing_screen)
@@ -66,6 +67,19 @@ pub fn configure_loading(app: &mut App) {
                 .run_if(in_state(GameState::Processing)),
         )
         .add_systems(OnExit(GameState::Processing), despawn_processing_screen);
+}
+
+fn trigger_initial_aspect_ratio(
+    windows: Query<(Entity, &Window)>,
+    mut writer: bevy::ecs::message::MessageWriter<bevy::window::WindowResized>,
+) {
+    for (entity, window) in windows.iter() {
+        writer.write(bevy::window::WindowResized {
+            window: entity,
+            width: window.resolution.width(),
+            height: window.resolution.height(),
+        });
+    }
 }
 
 fn setup_camera(mut commands: Commands) {
