@@ -3,7 +3,9 @@ use bevy::prelude::*;
 use std::collections::HashMap;
 
 use crate::GameState;
-use crate::rune_words::battle::{BattleSet, RowLetterGraded, RowResolved, RuneMatchState};
+use crate::rune_words::battle::{
+    BattlePhase, BattleSet, BattleState, RowLetterGraded, RowResolved, RuneMatchState,
+};
 use crate::ui::hud_root::InscribedPanel;
 use crate::ui::palette::*;
 
@@ -33,6 +35,7 @@ pub struct AttemptRowTile;
 #[derive(Resource, Default)]
 pub struct PendingLedgerData {
     pub rows: HashMap<u32, Vec<(char, RuneMatchState)>>,
+    pub row_phases: HashMap<u32, BattlePhase>,
 }
 
 pub fn configure_inscribed(app: &mut App) {
@@ -205,8 +208,18 @@ pub fn spawn_inscribed_ui(
 fn accumulate_row_grading(
     mut events: MessageReader<RowLetterGraded>,
     mut pending: ResMut<PendingLedgerData>,
+    battle_state: Option<Res<BattleState>>,
 ) {
+    let current_phase = battle_state
+        .as_ref()
+        .map(|state| state.phase)
+        .unwrap_or(BattlePhase::Idle);
+
     for event in events.read() {
+        pending
+            .row_phases
+            .entry(event.row_id)
+            .or_insert(current_phase);
         pending
             .rows
             .entry(event.row_id)
@@ -233,36 +246,36 @@ fn populate_ledger_on_row_resolved(
         return;
     };
 
-    let font_im_fell = game_assets.as_ref().map(|a| a.font_im_fell_sc.clone());
     let font_garamond = game_assets
         .as_ref()
         .map(|a| a.font_cormorant_garamond_italic.clone());
 
     for row_id in row_ids {
         let tiles = pending.rows.remove(&row_id).unwrap_or_default();
+        let scored_phase = pending
+            .row_phases
+            .remove(&row_id)
+            .unwrap_or(BattlePhase::Idle);
         let word = last_word.word.clone();
 
         // Cap the number of retained rows to bound memory use.
-        let existing: Vec<(Entity, u32)> =
-            existing_rows.iter().map(|(entity, row)| (entity, row.row_id)).collect();
+        let existing: Vec<(Entity, u32)> = existing_rows
+            .iter()
+            .map(|(entity, row)| (entity, row.row_id))
+            .collect();
         if existing.len() >= 20 {
             if let Some((oldest_entity, _)) = existing.into_iter().min_by_key(|(_, id)| *id) {
                 commands.entity(oldest_entity).despawn();
             }
         }
 
-        let index_str = match row_id {
-            0 => "I.",
-            1 => "II.",
-            2 => "III.",
-            3 => "IV.",
-            4 => "V.",
-            _ => "·",
-        };
-
-        let subtitle = match &word {
-            Some(w) => format!("\"{}\"", w),
-            None => "— unknown —".to_string(),
+        let subtitle = if scored_phase == BattlePhase::Binding {
+            "\"???\"".to_string()
+        } else {
+            match &word {
+                Some(w) => format!("\"{}\"", w),
+                None => "— unknown —".to_string(),
+            }
         };
 
         let attempt_row = commands
@@ -272,29 +285,18 @@ fn populate_ledger_on_row_resolved(
                     flex_direction: FlexDirection::Row,
                     align_items: AlignItems::FlexStart,
                     flex_shrink: 0.0,
-                    column_gap: Val::Percent(3.0),
+                    column_gap: Val::Px(4.0),
                     overflow: Overflow::clip(),
                     ..default()
                 },
             ))
             .with_children(|row| {
-                // Index numeral
-                row.spawn((
-                    Text::new(index_str.to_string()),
-                    TextFont {
-                        font: font_im_fell.clone().unwrap_or_default(),
-                        font_size: 10.0,
-                        ..default()
-                    },
-                    TextColor(PARCHMENT_DARK),
-                ));
-
                 // Tiles column + word subtitle
                 row.spawn(Node {
                     flex_direction: FlexDirection::Column,
                     flex_grow: 1.0,
                     min_width: Val::Px(0.0),
-                    row_gap: Val::Percent(1.0),
+                    row_gap: Val::Px(3.0),
                     overflow: Overflow::clip(),
                     ..default()
                 })
@@ -313,8 +315,8 @@ fn populate_ledger_on_row_resolved(
                             tiles_row.spawn((
                                 AttemptRowTile,
                                 Node {
-                                    width: Val::Px(14.0),
-                                    height: Val::Px(14.0),
+                                    width: Val::Px(18.0),
+                                    height: Val::Px(18.0),
                                     border: UiRect::all(Val::Px(1.0)),
                                     ..default()
                                 },
@@ -334,7 +336,7 @@ fn populate_ledger_on_row_resolved(
                         Text::new(subtitle),
                         TextFont {
                             font: font_garamond.clone().unwrap_or_default(),
-                            font_size: 9.0,
+                            font_size: 11.0,
                             ..default()
                         },
                         TextColor(PARCHMENT_DARK),
@@ -343,7 +345,9 @@ fn populate_ledger_on_row_resolved(
             })
             .id();
 
-        commands.entity(ledger_entity).add_child(attempt_row);
+        commands
+            .entity(ledger_entity)
+            .insert_children(0, &[attempt_row]);
     }
 
     // Fade oldest row if ledger has more than one entry.
