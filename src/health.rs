@@ -19,7 +19,8 @@ pub struct NpcCombatState {
     pub max: u32,
     pub bindings: u32,
     pub attack_state: NpcAttackState,
-    pub chosen_attack: Option<NpcAttack>,
+    pub chosen_attack: Option<NpcAttackSpec>,
+    pub attacks: Vec<NpcAttackSpec>,
 }
 
 #[derive(Component, Debug, Clone, Copy, PartialEq)]
@@ -31,12 +32,15 @@ pub enum NpcAttackState {
 }
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Deserialize)]
-pub struct NpcAttack {
+pub struct NpcAttackSpec {
     pub thinking_time: f32,
     pub attack_time: f32,
     pub damage: u32,
     pub cooldown_time: f32,
 }
+
+#[derive(bevy::ecs::message::Message, Clone, Copy, Debug)]
+pub struct NpcAttack(pub u32);
 
 impl Default for NpcCombatState {
     fn default() -> Self {
@@ -46,6 +50,7 @@ impl Default for NpcCombatState {
             bindings: 0,
             attack_state: NpcAttackState::Cooldown(3.0),
             chosen_attack: None,
+            attacks: Vec::new(),
         }
     }
 }

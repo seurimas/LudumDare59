@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
-use crate::health::NpcCombatState;
+use crate::health::{NpcAttackState, NpcCombatState};
+use crate::npcs::NpcSpec;
 use crate::rune_words::battle::{BattlePhase, BattleState, NpcType};
 use crate::ui::clock::{BattleUiClock, wave};
 use crate::ui::hud_root::ArenaPanel;
@@ -187,11 +188,19 @@ pub fn spawn_arena_ui(
 
 // ─── NPC sprite sync (moved from combat.rs) ───────────────────────────────────
 
-fn phase_to_sprite_index(phase: BattlePhase) -> usize {
-    match phase {
-        BattlePhase::Acting => 2,
-        BattlePhase::Binding => 3,
-        BattlePhase::Idle => 0,
+fn npc_sprite_index(npc: &NpcCombatState, phase: BattlePhase) -> usize {
+    if matches!(phase, BattlePhase::Binding)
+        || matches!(npc.attack_state, NpcAttackState::Stunned(_))
+    {
+        return 3;
+    }
+    if npc.chosen_attack.is_none() {
+        return 0;
+    }
+    match npc.attack_state {
+        NpcAttackState::WaitingFor(_) => 1,
+        NpcAttackState::AttackingIn(_) => 2,
+        _ => 0,
     }
 }
 
@@ -209,13 +218,14 @@ fn npc_image(npc_type: NpcType, game_assets: &GameAssets) -> ImageNode {
 fn sync_npc_sprite(
     mut commands: Commands,
     game_assets: Res<GameAssets>,
+    npc_specs: Res<Assets<NpcSpec>>,
     battle_state: Option<Res<BattleState>>,
     panel_query: Query<Entity, With<ArenaPanel>>,
-    mut npc_query: Query<(Entity, &mut ImageNode), With<NpcSprite>>,
+    mut npc_query: Query<(Entity, &mut ImageNode, &NpcCombatState), With<NpcSprite>>,
     shadow_query: Query<Entity, With<GroundShadow>>,
 ) {
     let Some(battle_state) = battle_state else {
-        for (entity, _) in &npc_query {
+        for (entity, _, _) in &npc_query {
             commands.entity(entity).despawn();
         }
         for entity in &shadow_query {
@@ -228,7 +238,7 @@ fn sync_npc_sprite(
         battle_state.npc_type.is_some() && !matches!(battle_state.phase, BattlePhase::Idle);
 
     if !should_show {
-        for (entity, _) in &npc_query {
+        for (entity, _, _) in &npc_query {
             commands.entity(entity).despawn();
         }
         for entity in &shadow_query {
@@ -238,12 +248,24 @@ fn sync_npc_sprite(
     }
 
     let npc_type = battle_state.npc_type.unwrap();
-    let sprite_index = phase_to_sprite_index(battle_state.phase);
 
     if npc_query.is_empty() {
         let Ok(panel_entity) = panel_query.single() else {
             return;
         };
+
+        let spec_handle = match npc_type {
+            NpcType::Goblin => &game_assets.goblin_spec,
+            NpcType::Robed => &game_assets.robed_spec,
+        };
+        let mut combat_state = NpcCombatState::default();
+        if let Some(spec) = npc_specs.get(spec_handle) {
+            combat_state.max = spec.max_health;
+            combat_state.hp = spec.max_health;
+            combat_state.attacks = spec.attacks.clone();
+        }
+
+        let sprite_index = npc_sprite_index(&combat_state, battle_state.phase);
         let mut image_node = npc_image(npc_type, &game_assets);
         if let Some(atlas) = &mut image_node.texture_atlas {
             atlas.index = sprite_index;
@@ -267,7 +289,7 @@ fn sync_npc_sprite(
             // NPC sprite: ~22% wide, centered horizontally, 28% from top
             arena.spawn((
                 NpcSprite,
-                NpcCombatState::default(),
+                combat_state,
                 Node {
                     position_type: PositionType::Absolute,
                     top: Val::Percent(28.0),
@@ -281,7 +303,8 @@ fn sync_npc_sprite(
             ));
         });
     } else {
-        for (_, mut image_node) in &mut npc_query {
+        for (_, mut image_node, combat_state) in &mut npc_query {
+            let sprite_index = npc_sprite_index(combat_state, battle_state.phase);
             if let Some(atlas) = &mut image_node.texture_atlas {
                 atlas.index = sprite_index;
             }

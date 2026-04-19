@@ -110,6 +110,7 @@ pub fn configure_app(app: &mut App) {
     futhark::configure_futhark_keyboard(app);
     rune_words::rune_slots::configure_rune_slots(app);
     ui::configure_ui(app);
+    combat::configure_combat(app);
 
     app.init_resource::<PlayerCombatState>();
 

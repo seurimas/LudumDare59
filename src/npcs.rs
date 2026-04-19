@@ -3,14 +3,14 @@ use bevy::asset::{AssetLoader, LoadContext};
 use bevy::prelude::*;
 use serde::Deserialize;
 
-use crate::health::NpcAttack;
+use crate::health::NpcAttackSpec;
 use crate::rune_words::battle::NpcType;
 
 #[derive(Asset, TypePath, Deserialize, Debug, Clone)]
 pub struct NpcSpec {
     pub max_health: u32,
     pub npc_type: NpcType,
-    pub attacks: Vec<NpcAttack>,
+    pub attacks: Vec<NpcAttackSpec>,
 }
 
 #[derive(Default, TypePath)]
