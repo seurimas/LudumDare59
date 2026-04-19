@@ -9,7 +9,7 @@ When you are asked to do something, it should fall under a certain umbrella. Bas
 - tasks/TASK_BUGFIX.md
   - This is a bugfix.
 - BEVY_REDESIGN_TODOS.md and BEVY_REDESIGN_PLAN.md and MOCKUP_REDESIGN.md
-  - When working on the bevy redesign, go to these files first!
+  - When working on the bevy redesign, go to these files first! If not given a specific task, choose the first todo item. When you're done, update the TODO, commit, and ask before cont
 
 ## Running UAT binaries
 

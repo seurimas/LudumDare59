@@ -8,6 +8,7 @@ pub mod dictionary;
 pub mod futhark;
 pub mod loading;
 pub mod rune_words;
+pub mod ui;
 
 #[derive(States, Default, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum GameState {
