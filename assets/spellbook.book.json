@@ -15,11 +15,72 @@
     },
     {
         "word": "shield",
+        "starter": true,
         "effects": [
             {
                 "type": "shield",
                 "amount": 30,
                 "duration": 15.0
+            }
+        ]
+    },
+    {
+        "word": "blast",
+        "starter": true,
+        "effects": [
+            {
+                "type": "damage",
+                "amount": 10
+            }
+        ]
+    },
+    {
+        "word": "cannon",
+        "starter": true,
+        "effects": [
+            {
+                "type": "damage",
+                "amount": 5
+            },
+            {
+                "type": "damage",
+                "amount": 5
+            }
+        ]
+    },
+    {
+        "word": "laser",
+        "starter": true,
+        "effects": [
+            {
+                "type": "damage",
+                "amount": 2
+            },
+            {
+                "type": "damage",
+                "amount": 2
+            },
+            {
+                "type": "damage",
+                "amount": 2
+            },
+            {
+                "type": "damage",
+                "amount": 2
+            },
+            {
+                "type": "damage",
+                "amount": 2
+            }
+        ]
+    },
+    {
+        "word": "lance",
+        "starter": true,
+        "effects": [
+            {
+                "type": "damage",
+                "amount": 15
             }
         ]
     },
@@ -34,6 +95,7 @@
     },
     {
         "word": "evoke",
+        "starter": true,
         "effects": [
             {
                 "type": "buff",
@@ -155,6 +217,7 @@
     },
     {
         "word": "bop",
+        "starter": true,
         "effects": [
             {
                 "type": "stun",

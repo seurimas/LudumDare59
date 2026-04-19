@@ -34,7 +34,10 @@ fn main() {
         spawn_futhark_keyboard.after(spawn_battle_hud_root),
     );
     app.add_systems(OnEnter(GameState::Adventure), setup_demo);
-    app.add_systems(Update, demo_controller.run_if(in_state(GameState::Adventure)));
+    app.add_systems(
+        Update,
+        demo_controller.run_if(in_state(GameState::Adventure)),
+    );
     app.add_systems(
         Update,
         (on_quicktime, on_acting_succeeded, on_binding_succeeded)

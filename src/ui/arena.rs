@@ -250,6 +250,7 @@ fn sync_npc_sprite(
     mut commands: Commands,
     game_assets: Res<GameAssets>,
     battle_state: Option<Res<BattleState>>,
+    tutorial: Option<Res<crate::tutorial::TutorialState>>,
     panel_query: Query<Entity, With<ArenaPanel>>,
     mut npc_query: Query<
         (Entity, &mut ImageNode, &NpcCombatState),
@@ -276,8 +277,7 @@ fn sync_npc_sprite(
         return;
     }
 
-    let should_show =
-        battle_state.npc.is_some() && !matches!(battle_state.phase, BattlePhase::Idle);
+    let should_show = battle_state.npc.is_some();
 
     if !should_show {
         for (entity, _, _) in &npc_query {

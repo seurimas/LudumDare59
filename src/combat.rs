@@ -11,6 +11,7 @@ use crate::health::{NpcAttack, NpcAttackState, NpcCombatState, PlayerCombatState
 use crate::rune_words::battle::{BattlePhase, BattleState};
 use crate::rune_words::battle_states::binding::{BindingData, BindingSucceeded, StartBinding};
 use crate::spellbook::Book;
+use crate::tutorial::TutorialState;
 
 /// Raised to signal the start of a fresh combat. Consumers reset per-combat
 /// state (deck/hand/discard) when this fires.
@@ -41,8 +42,12 @@ fn reset_player_deck_on_battle_start(
     mut player: ResMut<PlayerCombatState>,
     game_assets: Option<Res<GameAssets>>,
     books: Res<Assets<Book>>,
+    tutorial: Option<Res<TutorialState>>,
 ) {
     if events.read().count() == 0 {
+        return;
+    }
+    if tutorial.map_or(false, |t| t.active) {
         return;
     }
     let Some(game_assets) = game_assets else {
@@ -58,6 +63,7 @@ fn reset_player_deck_on_battle_start(
 fn tick_npc_attacks(
     time: Res<Time>,
     battle_state: Option<Res<BattleState>>,
+    tutorial: Option<Res<TutorialState>>,
     mut npcs: Query<&mut NpcCombatState>,
     mut npc_attack: MessageWriter<NpcAttack>,
 ) {
@@ -65,10 +71,17 @@ fn tick_npc_attacks(
         .as_ref()
         .is_some_and(|s| matches!(s.phase, BattlePhase::Binding));
 
+    let in_tutorial = tutorial.as_ref().is_some_and(|t| t.active);
+
     let dt = time.delta_secs();
 
     for mut npc in &mut npcs {
         if in_binding {
+            continue;
+        }
+
+        // During tutorial, timers tick but attacks never fire
+        if in_tutorial {
             continue;
         }
 
@@ -133,11 +146,31 @@ fn tick_npc_attacks(
 fn setup_binding_target_on_battle_start(
     mut events: MessageReader<BattleStart>,
     battle_state: Res<BattleState>,
+    tutorial: Option<Res<TutorialState>>,
     mut binding_data: ResMut<BindingData>,
 ) {
     if events.read().count() == 0 {
         return;
     }
+
+    // During tutorial, use a fixed binding word
+    if tutorial.as_ref().is_some_and(|t| t.active) {
+        match dictionary::futharkation_from_word(crate::tutorial::TUTORIAL_BINDING_WORD) {
+            Ok(futharkation) => {
+                binding_data.target = Some(futharkation);
+                binding_data.attempts_remaining = 0; // unlimited attempts
+            }
+            Err(e) => {
+                bevy::log::warn!(
+                    "Could not futharkate tutorial binding word '{}': {}",
+                    crate::tutorial::TUTORIAL_BINDING_WORD,
+                    e
+                );
+            }
+        }
+        return;
+    }
+
     let Some(spec) = battle_state.npc.as_ref() else {
         return;
     };
@@ -203,7 +236,10 @@ fn check_player_death(
 }
 
 fn debug_kill_player(input: Res<ButtonInput<KeyCode>>, mut player: ResMut<PlayerCombatState>) {
-    if input.pressed(KeyCode::ControlLeft) && input.pressed(KeyCode::ShiftLeft) && input.just_pressed(KeyCode::Digit0) {
+    if input.pressed(KeyCode::ControlLeft)
+        && input.pressed(KeyCode::ShiftLeft)
+        && input.just_pressed(KeyCode::Digit0)
+    {
         player.hp = 0;
     }
 }

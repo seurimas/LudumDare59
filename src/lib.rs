@@ -14,6 +14,7 @@ pub mod loading;
 pub mod npcs;
 pub mod rune_words;
 pub mod spellbook;
+pub mod tutorial;
 pub mod ui;
 
 #[derive(States, Default, Debug, Clone, PartialEq, Eq, Hash)]
@@ -122,6 +123,7 @@ pub fn configure_app(app: &mut App) {
     rune_words::rune_slots::configure_rune_slots(app);
     ui::configure_ui(app);
     combat::configure_combat(app);
+    tutorial::configure_tutorial(app);
 
     app.init_resource::<PlayerCombatState>();
     app.init_resource::<RunStats>();

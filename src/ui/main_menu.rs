@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use bevy_aspect_ratio_mask::Hud;
 
 use crate::GameState;
+use crate::tutorial::TutorialState;
 use crate::ui::palette::{GOLD, GOLD_DARK, INK, NIGHT, PARCHMENT, PARCHMENT_WARM};
 
 #[derive(Component)]
@@ -10,12 +11,15 @@ struct MainMenuRoot;
 #[derive(Component)]
 struct StartButton;
 
+#[derive(Component)]
+struct TutorialButton;
+
 pub fn configure_main_menu(app: &mut App) {
     app.add_systems(OnEnter(GameState::MainMenu), spawn_main_menu);
     app.add_systems(OnExit(GameState::MainMenu), despawn_main_menu);
     app.add_systems(
         Update,
-        handle_start_button.run_if(in_state(GameState::MainMenu)),
+        (handle_start_button, handle_tutorial_button).run_if(in_state(GameState::MainMenu)),
     );
 }
 
@@ -85,6 +89,29 @@ fn spawn_main_menu(mut commands: Commands, hud: Res<Hud>, game_assets: Res<crate
                         TextColor(PARCHMENT),
                     )],
                 ));
+
+                // Tutorial button
+                menu.spawn((
+                    TutorialButton,
+                    Button,
+                    Node {
+                        padding: UiRect::axes(Val::Px(48.0), Val::Px(16.0)),
+                        border: UiRect::all(Val::Px(2.0)),
+                        margin: UiRect::top(Val::Px(12.0)),
+                        ..default()
+                    },
+                    BackgroundColor(INK),
+                    BorderColor::from(GOLD_DARK),
+                    children![(
+                        Text::new("Tutorial"),
+                        TextFont {
+                            font: game_assets.font_cormorant_unicase_semibold.clone(),
+                            font_size: 24.0,
+                            ..default()
+                        },
+                        TextColor(PARCHMENT),
+                    )],
+                ));
             });
     });
 }
@@ -101,6 +128,19 @@ fn handle_start_button(
 ) {
     for interaction in &interactions {
         if *interaction == Interaction::Pressed {
+            next_state.set(GameState::Adventure);
+        }
+    }
+}
+
+fn handle_tutorial_button(
+    interactions: Query<&Interaction, (Changed<Interaction>, With<TutorialButton>)>,
+    mut next_state: ResMut<NextState<GameState>>,
+    mut tutorial: ResMut<TutorialState>,
+) {
+    for interaction in &interactions {
+        if *interaction == Interaction::Pressed {
+            *tutorial = TutorialState::start();
             next_state.set(GameState::Adventure);
         }
     }

@@ -50,14 +50,18 @@ pub fn configure_acting(app: &mut App) {
 fn refill_hand_on_acting_success(
     mut events: MessageReader<ActingSucceeded>,
     player: Option<ResMut<PlayerCombatState>>,
+    tutorial: Option<Res<crate::tutorial::TutorialState>>,
 ) {
     let Some(mut player) = player else {
         return;
     };
+    let in_tutorial = tutorial.map_or(false, |t| t.active);
     let mut rng = rand::thread_rng();
     for event in events.read() {
         if player.cast_from_hand(&event.matched.word) {
-            player.draw(1, &mut rng);
+            if !in_tutorial {
+                player.draw(1, &mut rng);
+            }
         }
     }
 }
