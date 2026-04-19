@@ -8,10 +8,22 @@ use crate::GameState;
 use crate::RunStats;
 use crate::dictionary;
 use crate::health::{NpcAttack, NpcAttackState, NpcCombatState, PlayerCombatState};
+use crate::npcs::NpcSpec;
 use crate::rune_words::battle::{BattlePhase, BattleState};
+use crate::rune_words::battle_states::acting::StartActing;
 use crate::rune_words::battle_states::binding::{BindingData, BindingSucceeded, StartBinding};
 use crate::spellbook::Book;
 use crate::tutorial::TutorialState;
+use crate::ui::effects::EffectsQueue;
+
+const NPC_SPAWN_DELAY: f32 = 5.0;
+
+/// Timer that counts down before a new NPC is spawned.
+#[derive(Resource)]
+pub struct NpcSpawnTimer {
+    pub remaining: f32,
+    pub active: bool,
+}
 
 /// Raised to signal the start of a fresh combat. Consumers reset per-combat
 /// state (deck/hand/discard) when this fires.
@@ -21,6 +33,10 @@ pub struct BattleStart;
 pub fn configure_combat(app: &mut App) {
     app.add_message::<NpcAttack>();
     app.add_message::<BattleStart>();
+    app.insert_resource(NpcSpawnTimer {
+        remaining: NPC_SPAWN_DELAY,
+        active: false,
+    });
     app.add_systems(
         Update,
         (
@@ -30,6 +46,9 @@ pub fn configure_combat(app: &mut App) {
             setup_binding_target_on_battle_start,
             trigger_binding_on_npc_death,
             track_enemies_defeated,
+            trigger_victory_on_binding_success,
+            resume_combat_after_effects,
+            tick_npc_spawn_timer,
             check_player_death,
             debug_kill_player,
         )
@@ -242,4 +261,107 @@ fn debug_kill_player(input: Res<ButtonInput<KeyCode>>, mut player: ResMut<Player
     {
         player.hp = 0;
     }
+}
+
+/// After the effects queue drains and phase is Idle with an NPC present,
+/// either restart acting (NPC alive) or trigger binding (NPC dead).
+fn resume_combat_after_effects(
+    effects: Res<EffectsQueue>,
+    battle_state: Res<BattleState>,
+    tutorial: Option<Res<TutorialState>>,
+    npcs: Query<&NpcCombatState>,
+    mut start_acting: MessageWriter<StartActing>,
+    mut start_binding: MessageWriter<StartBinding>,
+) {
+    if tutorial.as_ref().is_some_and(|t| t.active) {
+        return;
+    }
+    if effects.is_busy() {
+        return;
+    }
+    if !matches!(battle_state.phase, BattlePhase::Idle) {
+        return;
+    }
+    if battle_state.npc.is_none() {
+        return;
+    }
+
+    let npc_dead = npcs.iter().any(|npc| npc.hp == 0);
+    if npc_dead {
+        start_binding.write(StartBinding(None));
+    } else {
+        start_acting.write(StartActing);
+    }
+}
+
+/// After binding succeeds (non-tutorial), transition to Victory so the death
+/// fade plays and the NPC is eventually cleared.
+fn trigger_victory_on_binding_success(
+    mut events: MessageReader<BindingSucceeded>,
+    tutorial: Option<Res<TutorialState>>,
+    mut battle_state: ResMut<BattleState>,
+) {
+    if tutorial.as_ref().is_some_and(|t| t.active) {
+        events.clear();
+        return;
+    }
+    if events.read().last().is_none() {
+        return;
+    }
+    if battle_state.npc.is_some() {
+        battle_state.phase = BattlePhase::Victory;
+    }
+}
+
+/// When there is no NPC and phase is Idle, count down a timer and then spawn a
+/// random NPC to start a new battle.
+fn tick_npc_spawn_timer(
+    time: Res<Time>,
+    mut spawn_timer: ResMut<NpcSpawnTimer>,
+    mut battle_state: ResMut<BattleState>,
+    tutorial: Option<Res<TutorialState>>,
+    game_assets: Option<Res<GameAssets>>,
+    npc_specs: Res<Assets<NpcSpec>>,
+    mut battle_start: MessageWriter<BattleStart>,
+    mut start_acting: MessageWriter<StartActing>,
+) {
+    if tutorial.as_ref().is_some_and(|t| t.active) {
+        return;
+    }
+
+    let npc_gone = battle_state.npc.is_none() && matches!(battle_state.phase, BattlePhase::Idle);
+
+    if !npc_gone {
+        spawn_timer.active = false;
+        return;
+    }
+
+    if !spawn_timer.active {
+        spawn_timer.remaining = NPC_SPAWN_DELAY;
+        spawn_timer.active = true;
+    }
+
+    spawn_timer.remaining -= time.delta_secs();
+    if spawn_timer.remaining > 0.0 {
+        return;
+    }
+
+    spawn_timer.active = false;
+
+    let Some(game_assets) = game_assets else {
+        return;
+    };
+
+    let candidates: Vec<&Handle<NpcSpec>> = vec![&game_assets.goblin_spec, &game_assets.robed_spec];
+    let mut rng = rand::thread_rng();
+    let Some(&chosen_handle) = candidates.choose(&mut rng) else {
+        return;
+    };
+    let Some(spec) = npc_specs.get(chosen_handle) else {
+        return;
+    };
+
+    battle_state.npc = Some(spec.clone());
+    battle_start.write(BattleStart);
+    start_acting.write(StartActing);
 }

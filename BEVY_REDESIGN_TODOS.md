@@ -157,38 +157,21 @@ dependency order. Check items off as they are completed.
 
 ## 7. Book of Combat (right column)
 
-> Replaces `ActingBookPanel` in `src/rune_words/battle_states/acting.rs`.
-> Renamed from "Book of Acting" → **"Book of Combat"**.
-> Rules for spell selection will change soon; keep data wiring minimal.
 
-- [ ] Create `src/ui/book.rs` with `pub fn configure_book(app)`
-- [ ] Spawn `BookPanel` in grid row 2 col 3 using `spawn_leather_panel`
-      helper (§8.1 of plan):
-      - Header: "Book of Combat" (Cormorant Unicase, GOLD_LIGHT)
-      - "choose · inscribe" aside (IM Fell SC italic, PARCHMENT_DARK)
-- [ ] Spawn `BookPage` inner parchment node (flat `PARCHMENT_WARM`
-      `BackgroundColor` until parchment tile asset exists; swap to
-      `NodeImageMode::Tiled` once asset is ready):
-      - Page head rule text
-      - Red bookmark tab (absolute, top edge, BLOOD)
-- [ ] Spawn 4 `SpellEntry` nodes (3-column grid: dropcap / content / sigil):
-      - Dropcap: UnifrakturMaguntia, BLOOD
-      - Word text: Cormorant Unicase Bold, INK, uppercase
-      - Rune display row (futhark sprites)
-      - Sigil circle placeholder (solid ring border, Node; swap to sigil
-        atlas `ImageNode` once `sigils.png` asset exists)
-- [ ] **TODO**: Wire `SpellEntry` to combat phase data — exact data source
-      TBD when combat rules are finalised
-- [ ] **TODO**: Active spell highlight (BLOOD left border, ember background
-      tint, pulsing `☛` pointer) — implement once selection logic is defined
-- [ ] Remove `spawn_acting_book_panel`, `ActingBookPanel`,
-      `ActingBookEntry`, `ActingBookEntryBackground` from
-      `src/rune_words/battle_states/acting.rs` once `BookPanel` is live
-- [ ] Remove `Reacting`-related state files and systems
-      (`src/rune_words/battle_states/reacting.rs`) — the Reacting phase
-      no longer exists
-- [ ] Run `uat_shows_acting_battle_state` (rename to
-      `uat_shows_combat_battle_state` when convenient) — confirm zero exit
+- [x] Initial version done
+- [ ] For each spell, show:
+  - The name
+  - The runes
+  - The list of effects
+    - Each effect type will have a icon from the futhark spritesheet.
+      - Damage - 250
+      - Shield - 249
+      - Stun - 248
+      - Buff - 247
+      - Binding - 246
+    - Also show up to two numbers under each icon:
+      - Damage/stun/binding - just amount
+      - Shield/Buff - Power and duration in seconds
 
 ---
 
