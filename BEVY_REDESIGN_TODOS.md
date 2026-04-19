@@ -14,7 +14,7 @@ dependency order. Check items off as they are completed.
 
 - [x] Add color constants module (`src/ui/palette.rs`) with all `PARCHMENT`,
       `GOLD`, `BLOOD`, `NIGHT`, etc. constants (see §0.3 of plan)
-- [ ] Add `BattleUiClock` resource (`src/ui/clock.rs`) with `elapsed: f32`
+- [x] Add `BattleUiClock` resource (`src/ui/clock.rs`) with `elapsed: f32`
       and a `tick_clock` system running in `Update` while `GameState::Ready`
 - [ ] Add `HpState` resource (`player_hp`, `player_max`, `enemy_hp`,
       `enemy_max: u32`) — stub with fixed values initially

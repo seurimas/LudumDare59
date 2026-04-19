@@ -74,6 +74,7 @@ pub fn configure_app(app: &mut App) {
     futhark::configure_futhark_keyboard(app);
     rune_words::rune_slots::configure_rune_slots(app);
     combat::configure_combat(app);
+    ui::clock::configure_clock(app);
 
     app.add_systems(
         Update,
