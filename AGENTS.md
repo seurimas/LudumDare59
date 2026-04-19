@@ -8,6 +8,8 @@ When you are asked to do something, it should fall under a certain umbrella. Bas
   - This is an update to a feature, which may include new features as well. It is not fixing a bug.
 - tasks/TASK_BUGFIX.md
   - This is a bugfix.
+- BEVY_REDESIGN_TODOS.md and BEVY_REDESIGN_PLAN.md and MOCKUP_REDESIGN.md
+  - When working on the bevy redesign, go to these files first!
 
 ## Running UAT binaries
 
