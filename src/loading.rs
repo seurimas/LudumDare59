@@ -207,7 +207,7 @@ fn process_next_letter(
         std::mem::swap(&mut baked.regular, &mut queue.regular_samples);
         std::mem::swap(&mut baked.conversational, &mut queue.conversational_samples);
         commands.insert_resource(baked);
-        next_state.set(GameState::Ready);
+        next_state.set(GameState::MainMenu);
     }
 }
 

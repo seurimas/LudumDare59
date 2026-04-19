@@ -70,12 +70,12 @@ struct PhasePip {
 
 pub fn configure_health_bars(app: &mut App) {
     app.add_systems(
-        OnEnter(GameState::Ready),
+        OnEnter(GameState::Adventure),
         spawn_combat_bar.after(crate::ui::hud_root::spawn_battle_hud_root),
     );
     app.add_systems(
         Update,
-        (sync_hp_bars, sync_phase_banner).run_if(in_state(GameState::Ready)),
+        (sync_hp_bars, sync_phase_banner).run_if(in_state(GameState::Adventure)),
     );
 }
 

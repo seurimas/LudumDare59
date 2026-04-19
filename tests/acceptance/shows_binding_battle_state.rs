@@ -18,11 +18,11 @@ fn main() {
     configure_battle(&mut app);
 
     app.add_systems(
-        OnEnter(GameState::Ready),
+        OnEnter(GameState::Adventure),
         spawn_futhark_keyboard.after(spawn_battle_hud_root),
     );
-    app.add_systems(OnEnter(GameState::Ready), start_demo);
-    app.add_systems(Update, reset_on_f3.run_if(in_state(GameState::Ready)));
+    app.add_systems(OnEnter(GameState::Adventure), start_demo);
+    app.add_systems(Update, reset_on_f3.run_if(in_state(GameState::Adventure)));
 
     acceptance::initialize_app(
         &mut app,

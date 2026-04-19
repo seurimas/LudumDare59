@@ -10,7 +10,7 @@ fn main() {
     app.add_plugins(DefaultPlugins);
     configure_app(&mut app);
     configure_loading(&mut app);
-    app.add_systems(OnEnter(GameState::Ready), spawn_ready_confirmation);
+    app.add_systems(OnEnter(GameState::Adventure), spawn_ready_confirmation);
     acceptance::initialize_app(
         &mut app,
         AcceptanceTest::from(TEST_ID).with_grid(),

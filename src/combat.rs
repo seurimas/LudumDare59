@@ -5,10 +5,11 @@ use rand::seq::SliceRandom;
 
 use crate::GameAssets;
 use crate::GameState;
+use crate::RunStats;
 use crate::dictionary;
 use crate::health::{NpcAttack, NpcAttackState, NpcCombatState, PlayerCombatState};
 use crate::rune_words::battle::{BattlePhase, BattleState};
-use crate::rune_words::battle_states::binding::{BindingData, StartBinding};
+use crate::rune_words::battle_states::binding::{BindingData, BindingSucceeded, StartBinding};
 use crate::spellbook::Book;
 
 /// Raised to signal the start of a fresh combat. Consumers reset per-combat
@@ -23,11 +24,14 @@ pub fn configure_combat(app: &mut App) {
         Update,
         (
             tick_npc_attacks,
+            apply_npc_damage_to_player,
             reset_player_deck_on_battle_start,
             setup_binding_target_on_battle_start,
             trigger_binding_on_npc_death,
+            track_enemies_defeated,
+            check_player_death,
         )
-            .run_if(in_state(GameState::Ready)),
+            .run_if(in_state(GameState::Adventure)),
     );
 }
 
@@ -167,5 +171,32 @@ fn trigger_binding_on_npc_death(
             start_binding.write(StartBinding(None));
             return;
         }
+    }
+}
+
+fn apply_npc_damage_to_player(
+    mut attacks: MessageReader<NpcAttack>,
+    mut player: ResMut<PlayerCombatState>,
+) {
+    for NpcAttack(damage) in attacks.read() {
+        player.apply_damage(*damage);
+    }
+}
+
+fn track_enemies_defeated(
+    mut events: MessageReader<BindingSucceeded>,
+    mut run_stats: ResMut<RunStats>,
+) {
+    for _ in events.read() {
+        run_stats.enemies_defeated += 1;
+    }
+}
+
+fn check_player_death(
+    player: Res<PlayerCombatState>,
+    mut next_state: ResMut<NextState<GameState>>,
+) {
+    if player.hp == 0 {
+        next_state.set(GameState::GameOver);
     }
 }

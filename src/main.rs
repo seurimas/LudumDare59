@@ -10,7 +10,7 @@ fn main() {
     let mut app = App::new();
     app.add_plugins(DefaultPlugins.set(WindowPlugin {
         primary_window: Some(Window {
-            title: "LudumDare59".into(),
+            title: "Runic Ascendancy".into(),
             resolution: bevy::window::WindowResolution::new(1280_u32, 960_u32),
             ..default()
         }),

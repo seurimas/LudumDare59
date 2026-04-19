@@ -21,7 +21,15 @@ pub enum GameState {
     #[default]
     Loading,
     Processing,
-    Ready,
+    MainMenu,
+    Adventure,
+    GameOver,
+}
+
+/// Tracks how many enemies the player has defeated across the entire run.
+#[derive(Resource, Default)]
+pub struct RunStats {
+    pub enemies_defeated: u32,
 }
 
 #[derive(AssetCollection, Resource)]
@@ -116,6 +124,7 @@ pub fn configure_app(app: &mut App) {
     combat::configure_combat(app);
 
     app.init_resource::<PlayerCombatState>();
+    app.init_resource::<RunStats>();
 
     app.add_systems(
         Update,
@@ -138,11 +147,11 @@ pub fn configure_app(app: &mut App) {
             rune_words::rune_slots::sync_rune_slot_visuals,
         )
             .chain()
-            .run_if(in_state(GameState::Ready)),
+            .run_if(in_state(GameState::Adventure)),
     );
     app.add_systems(
         Update,
-        rune_words::rune_slots::tick_word_audio_queue.run_if(in_state(GameState::Ready)),
+        rune_words::rune_slots::tick_word_audio_queue.run_if(in_state(GameState::Adventure)),
     );
 }
 

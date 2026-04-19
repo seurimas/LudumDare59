@@ -41,7 +41,7 @@ pub struct PendingLedgerData {
 pub fn configure_inscribed(app: &mut App) {
     app.init_resource::<PendingLedgerData>();
     app.add_systems(
-        OnEnter(GameState::Ready),
+        OnEnter(GameState::Adventure),
         spawn_inscribed_ui.after(crate::ui::hud_root::spawn_battle_hud_root),
     );
     app.add_systems(
@@ -49,7 +49,7 @@ pub fn configure_inscribed(app: &mut App) {
         (accumulate_row_grading, populate_ledger_on_row_resolved)
             .chain()
             .after(BattleSet::PostAnimation)
-            .run_if(in_state(GameState::Ready)),
+            .run_if(in_state(GameState::Adventure)),
     );
 }
 

@@ -48,13 +48,13 @@ struct SpellEntrySigil {
 
 pub fn configure_book(app: &mut App) {
     app.add_systems(
-        OnEnter(GameState::Ready),
+        OnEnter(GameState::Adventure),
         spawn_book_panel.after(crate::ui::hud_root::spawn_battle_hud_root),
     );
-    app.add_systems(Update, sync_book_panel.run_if(in_state(GameState::Ready)));
+    app.add_systems(Update, sync_book_panel.run_if(in_state(GameState::Adventure)));
     app.add_systems(
         Update,
-        pulse_active_pointer.run_if(in_state(GameState::Ready)),
+        pulse_active_pointer.run_if(in_state(GameState::Adventure)),
     );
 }
 

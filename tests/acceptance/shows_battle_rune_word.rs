@@ -17,10 +17,10 @@ fn main() {
     configure_battle(&mut app);
 
     app.add_systems(
-        OnEnter(GameState::Ready),
+        OnEnter(GameState::Adventure),
         spawn_futhark_keyboard.after(spawn_battle_hud_root),
     );
-    app.add_systems(OnEnter(GameState::Ready), start_random_battle_demo);
+    app.add_systems(OnEnter(GameState::Adventure), start_random_battle_demo);
 
     acceptance::initialize_app(
         &mut app,

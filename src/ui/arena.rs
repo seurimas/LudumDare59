@@ -45,7 +45,7 @@ const NPC_DEATH_FADE_DURATION: f32 = 0.8;
 
 pub fn configure_arena(app: &mut App) {
     app.add_systems(
-        OnEnter(GameState::Ready),
+        OnEnter(GameState::Adventure),
         spawn_arena_ui.after(crate::ui::hud_root::spawn_battle_hud_root),
     );
     app.add_systems(
@@ -56,7 +56,7 @@ pub fn configure_arena(app: &mut App) {
             animate_arena,
             animate_npc_death_fade,
         )
-            .run_if(in_state(GameState::Ready)),
+            .run_if(in_state(GameState::Adventure)),
     );
 }
 

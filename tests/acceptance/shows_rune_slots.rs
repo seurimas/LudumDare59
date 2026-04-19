@@ -15,10 +15,10 @@ fn main() {
     configure_loading(&mut app);
 
     app.add_systems(
-        OnEnter(GameState::Ready),
+        OnEnter(GameState::Adventure),
         spawn_futhark_keyboard.after(spawn_battle_hud_root),
     );
-    app.add_systems(OnEnter(GameState::Ready), spawn_demo_rune_slots);
+    app.add_systems(OnEnter(GameState::Adventure), spawn_demo_rune_slots);
 
     acceptance::initialize_app(
         &mut app,

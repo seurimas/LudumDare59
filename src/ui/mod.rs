@@ -4,10 +4,12 @@ pub mod arena;
 pub mod book;
 pub mod clock;
 pub mod effects;
+pub mod game_over;
 pub mod health_bars;
 pub mod hud_root;
 pub mod inscribed;
 pub mod keyboard;
+pub mod main_menu;
 pub mod palette;
 pub mod samplers;
 
@@ -20,4 +22,6 @@ pub fn configure_ui(app: &mut App) {
     book::configure_book(app);
     samplers::configure_samplers(app);
     effects::configure_effects(app);
+    main_menu::configure_main_menu(app);
+    game_over::configure_game_over(app);
 }

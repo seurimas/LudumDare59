@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy_aspect_ratio_mask::Hud;
 
 use crate::GameState;
-use crate::ui::palette::{GOLD_DARK, PARCHMENT_DARK};
+use crate::ui::palette::GOLD_DARK;
 
 #[derive(Component)]
 pub struct BattleHudRoot;
@@ -26,7 +26,8 @@ pub struct BookPanel;
 pub struct BindingPanel;
 
 pub fn configure_hud_root(app: &mut App) {
-    app.add_systems(OnEnter(GameState::Ready), spawn_battle_hud_root);
+    app.add_systems(OnEnter(GameState::Adventure), spawn_battle_hud_root);
+    app.add_systems(OnExit(GameState::Adventure), despawn_battle_hud_root);
 }
 
 pub fn spawn_battle_hud_root(mut commands: Commands, hud: Res<Hud>) {
@@ -60,7 +61,6 @@ pub fn spawn_battle_hud_root(mut commands: Commands, hud: Res<Hud>) {
                     placeholder_node(GridPlacement::span(3), GridPlacement::start(1)),
                     placeholder_background(),
                     placeholder_border_color(),
-                    children![placeholder_label("Combat Bar")],
                 ));
 
                 grid.spawn((
@@ -107,7 +107,6 @@ pub fn spawn_battle_hud_root(mut commands: Commands, hud: Res<Hud>) {
                     placeholder_node(GridPlacement::start(3), GridPlacement::start(2)),
                     placeholder_background(),
                     placeholder_border_color(),
-                    children![placeholder_label("Book Panel")],
                 ));
 
                 grid.spawn((
@@ -115,7 +114,6 @@ pub fn spawn_battle_hud_root(mut commands: Commands, hud: Res<Hud>) {
                     placeholder_node(GridPlacement::span(3), GridPlacement::start(3)),
                     placeholder_background(),
                     placeholder_border_color(),
-                    children![placeholder_label("Binding Panel")],
                 ));
             });
     });
@@ -146,13 +144,8 @@ fn placeholder_border_color() -> BorderColor {
     }
 }
 
-fn placeholder_label(label: &str) -> impl Bundle {
-    (
-        Text::new(label),
-        TextFont {
-            font_size: 14.0,
-            ..default()
-        },
-        TextColor(PARCHMENT_DARK),
-    )
+fn despawn_battle_hud_root(mut commands: Commands, roots: Query<Entity, With<BattleHudRoot>>) {
+    for entity in &roots {
+        commands.entity(entity).despawn();
+    }
 }

@@ -11,7 +11,7 @@ pub struct BattleUiClock {
 
 pub fn configure_clock(app: &mut App) {
     app.init_resource::<BattleUiClock>();
-    app.add_systems(Update, tick_clock.run_if(in_state(GameState::Ready)));
+    app.add_systems(Update, tick_clock.run_if(in_state(GameState::Adventure)));
 }
 
 fn tick_clock(mut clock: ResMut<BattleUiClock>, time: Res<Time>) {

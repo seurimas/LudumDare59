@@ -28,16 +28,16 @@ fn main() {
     configure_app(&mut app);
     configure_loading(&mut app);
     app.add_systems(
-        OnEnter(GameState::Ready),
+        OnEnter(GameState::Adventure),
         spawn_futhark_keyboard.after(spawn_battle_hud_root),
     );
-    app.add_systems(OnEnter(GameState::Ready), spawn_typed_rune_display);
-    app.add_systems(OnEnter(GameState::Ready), spawn_speed_controls);
+    app.add_systems(OnEnter(GameState::Adventure), spawn_typed_rune_display);
+    app.add_systems(OnEnter(GameState::Adventure), spawn_speed_controls);
     app.add_systems(
         Update,
         (update_typed_rune, handle_speed_buttons, sync_speed_label)
             .chain()
-            .run_if(in_state(GameState::Ready)),
+            .run_if(in_state(GameState::Adventure)),
     );
     acceptance::initialize_app(
         &mut app,

@@ -30,7 +30,7 @@ fn main() {
     app.init_resource::<ActiveFight>();
 
     app.add_systems(
-        OnEnter(GameState::Ready),
+        OnEnter(GameState::Adventure),
         (
             spawn_futhark_keyboard.after(spawn_battle_hud_root),
             spawn_instructions,
@@ -50,7 +50,7 @@ fn main() {
             update_deck_label,
         )
             .chain()
-            .run_if(in_state(GameState::Ready)),
+            .run_if(in_state(GameState::Adventure)),
     );
 
     acceptance::initialize_app(

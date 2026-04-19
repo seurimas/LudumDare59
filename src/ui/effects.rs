@@ -91,7 +91,7 @@ pub fn configure_effects(app: &mut App) {
             animate_buff_box_bounce,
         )
             .chain()
-            .run_if(in_state(GameState::Ready)),
+            .run_if(in_state(GameState::Adventure)),
     );
 }
 
