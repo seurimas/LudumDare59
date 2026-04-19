@@ -17,10 +17,6 @@ struct PlayerCombatantBlock;
 #[derive(Component)]
 struct EnemyCombatantBlock;
 
-/// Portrait placeholder for combatants.
-#[derive(Component)]
-struct PortraitNode;
-
 /// HP bar container node with overflow clipping.
 #[derive(Component)]
 struct HpBarOuter;
@@ -96,7 +92,6 @@ fn spawn_combat_bar(
         .insert(Node {
             grid_column: GridPlacement::span(3),
             grid_row: GridPlacement::start(1),
-            width: Val::Percent(100.0),
             min_width: Val::Percent(0.0),
             display: Display::Grid,
             grid_template_columns: vec![
@@ -130,7 +125,7 @@ fn spawn_combat_bar(
                     Node {
                         grid_column: GridPlacement::start(1),
                         grid_row: GridPlacement::start(1),
-                        min_width: Val::Percent(0.0),
+                        min_width: Val::Px(0.0),
                         flex_direction: FlexDirection::Row,
                         align_items: AlignItems::Center,
                         column_gap: Val::Percent(2.0),
@@ -139,33 +134,14 @@ fn spawn_combat_bar(
                     },
                 ))
                 .with_children(|block| {
-                    // Portrait
-                    block.spawn((
-                        PortraitNode,
-                        Node {
-                            width: Val::Percent(12.0),
-                            aspect_ratio: Some(1.0),
-                            border: UiRect::all(Val::Percent(0.24)),
-                            border_radius: BorderRadius::MAX,
-                            ..default()
-                        },
-                        BorderColor {
-                            top: GOLD,
-                            right: GOLD,
-                            bottom: GOLD,
-                            left: GOLD,
-                        },
-                        BackgroundColor(MANA),
-                    ));
-
                     // Name and HP
                     block
                         .spawn((Node {
-                            min_width: Val::Percent(0.0),
+                            min_width: Val::Px(0.0),
                             max_width: Val::Percent(84.0),
                             flex_direction: FlexDirection::Column,
                             flex_grow: 1.0,
-                            flex_basis: Val::Percent(0.0),
+                            flex_basis: Val::Px(0.0),
                             row_gap: Val::Percent(1.0),
                             ..default()
                         },))
@@ -185,7 +161,7 @@ fn spawn_combat_bar(
                                 HpBarOuter,
                                 Node {
                                     width: Val::Percent(100.0),
-                                    min_width: Val::Percent(0.0),
+                                    min_width: Val::Px(0.0),
                                     aspect_ratio: Some(30.0),
                                     border: UiRect::all(Val::Percent(0.12)),
                                     overflow: Overflow::clip(),
@@ -353,7 +329,7 @@ fn spawn_combat_bar(
                     Node {
                         grid_column: GridPlacement::start(3),
                         grid_row: GridPlacement::start(1),
-                        min_width: Val::Percent(0.0),
+                        min_width: Val::Px(0.0),
                         flex_direction: FlexDirection::RowReverse,
                         align_items: AlignItems::Center,
                         column_gap: Val::Percent(2.0),
@@ -362,33 +338,14 @@ fn spawn_combat_bar(
                     },
                 ))
                 .with_children(|block| {
-                    // Portrait
-                    block.spawn((
-                        PortraitNode,
-                        Node {
-                            width: Val::Percent(12.0),
-                            aspect_ratio: Some(1.0),
-                            border: UiRect::all(Val::Percent(0.24)),
-                            border_radius: BorderRadius::MAX,
-                            ..default()
-                        },
-                        BorderColor {
-                            top: GOLD,
-                            right: GOLD,
-                            bottom: GOLD,
-                            left: GOLD,
-                        },
-                        BackgroundColor(MANA),
-                    ));
-
                     // Name and HP (mirrored)
                     block
                         .spawn((Node {
-                            min_width: Val::Percent(0.0),
+                            min_width: Val::Px(0.0),
                             max_width: Val::Percent(84.0),
                             flex_direction: FlexDirection::Column,
                             flex_grow: 1.0,
-                            flex_basis: Val::Percent(0.0),
+                            flex_basis: Val::Px(0.0),
                             row_gap: Val::Percent(1.0),
                             align_items: AlignItems::FlexEnd,
                             ..default()
@@ -409,7 +366,7 @@ fn spawn_combat_bar(
                                 HpBarOuter,
                                 Node {
                                     width: Val::Percent(100.0),
-                                    min_width: Val::Percent(0.0),
+                                    min_width: Val::Px(0.0),
                                     aspect_ratio: Some(30.0),
                                     border: UiRect::all(Val::Percent(0.12)),
                                     overflow: Overflow::clip(),
