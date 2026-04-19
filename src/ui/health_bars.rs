@@ -29,6 +29,9 @@ struct HpBarFill;
 struct PlayerHpBarFill;
 
 #[derive(Component)]
+struct PlayerShieldBarFill;
+
+#[derive(Component)]
 struct EnemyHpBarFill;
 
 /// The tick overlay with 10 dividers.
@@ -189,6 +192,21 @@ fn spawn_combat_bar(
                                         ..default()
                                     },
                                     BackgroundColor(BLOOD),
+                                ));
+
+                                // Shield bar overlay (blue, positioned after HP fill)
+                                hp_bar.spawn((
+                                    PlayerShieldBarFill,
+                                    Node {
+                                        position_type: PositionType::Absolute,
+                                        top: Val::Percent(0.0),
+                                        bottom: Val::Percent(0.0),
+                                        height: Val::Percent(100.0),
+                                        width: Val::Percent(0.0),
+                                        left: Val::Percent(0.0),
+                                        ..default()
+                                    },
+                                    BackgroundColor(MANA_BRIGHT.with_alpha(0.6)),
                                 ));
 
                                 hp_bar
@@ -469,6 +487,15 @@ fn sync_hp_bars(
             With<HpBarFill>,
             With<PlayerHpBarFill>,
             Without<EnemyHpBarFill>,
+            Without<PlayerShieldBarFill>,
+        ),
+    >,
+    mut shield_fill_query: Query<
+        &mut Node,
+        (
+            With<PlayerShieldBarFill>,
+            Without<HpBarFill>,
+            Without<EnemyHpBarFill>,
         ),
     >,
     mut enemy_fill_query: Query<
@@ -477,6 +504,7 @@ fn sync_hp_bars(
             With<HpBarFill>,
             With<EnemyHpBarFill>,
             Without<PlayerHpBarFill>,
+            Without<PlayerShieldBarFill>,
         ),
     >,
     mut player_label_query: Query<
@@ -514,8 +542,23 @@ fn sync_hp_bars(
         node.width = Val::Percent(player_fill_percent);
     }
 
+    // Shield bar: shows as a blue overlay starting at the HP fill edge
+    let total_shield: f32 = player_health.shields.iter().map(|s| s.amount as f32).sum();
+    let shield_pct = (total_shield / player_max * 100.0).clamp(0.0, 100.0 - player_fill_percent);
+    if let Ok(mut node) = shield_fill_query.single_mut() {
+        node.left = Val::Percent(player_fill_percent);
+        node.width = Val::Percent(shield_pct);
+    }
+
     if let Ok(mut text) = player_label_query.single_mut() {
-        text.0 = format!("{} / {}", player_health.hp, player_health.max);
+        if total_shield > 0.0 {
+            text.0 = format!(
+                "{} +{} / {}",
+                player_health.hp, total_shield as u32, player_health.max
+            );
+        } else {
+            text.0 = format!("{} / {}", player_health.hp, player_health.max);
+        }
     }
 }
 

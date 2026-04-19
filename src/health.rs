@@ -15,6 +15,7 @@ pub struct PlayerCombatState {
     pub deck: Vec<SpellDef>,
     pub hand: Vec<SpellDef>,
     pub discard: Vec<SpellDef>,
+    pub next_buff_id: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -25,6 +26,7 @@ pub struct ShieldState {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Buff {
+    pub id: u64,
     pub name: String,
     pub value: i32,
     pub expires_in: f32,
@@ -40,6 +42,7 @@ impl Default for PlayerCombatState {
             deck: Vec::new(),
             hand: Vec::new(),
             discard: Vec::new(),
+            next_buff_id: 1,
         }
     }
 }
