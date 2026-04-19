@@ -117,6 +117,9 @@ alpha on top of the UI root.
 - **Portrait**: 5.8cqh circle, radial gradient fill, 3-ring frame
   (gold border / black hairline / dark gold outer), inner shadow, and a
   `conic-gradient` shimmer ring that rotates every 10s (`@keyframes shimmer`).
+- **Name only** — single-line Cormorant Unicase combatant name (Aëther /
+  Hoardling). No class/title subtitle: keeps the bar readable and avoids
+  decorative fluff.
 - **HP bar**: 1.9cqh tall, clipped to a chevron with `clip-path: polygon(...)`
   — both ends taper. Fill uses a vertical gradient, a top white sheen
   (`::after`), and 10 vertical tick marks as `<span>` flex children.
@@ -125,6 +128,7 @@ alpha on top of the UI root.
   anchors left, so the enemy bar needs `justify_content: End` or equivalent.
 - **Phase banner**: Cormorant Unicase 2.8cqh with a glowing ember text-shadow
   + three pip indicators (ReactingActingBinding), active one filled gold.
+  No flavour rule line beneath the name — the phase title is the signal.
 
 ### Inscribed Attempts (left)
 
@@ -132,16 +136,37 @@ Mirrors the rune-word lane. Structure:
 
 1. **Active composition card** — crimson-bordered, glowing, has a floating
    `INSCRIBING` label pinned to the top edge (`::before` with negative top).
-   Shows the in-progress rune string + a blinking crimson caret + target
-   word on the right.
+   Shows **only** the in-progress rune string and a blinking crimson caret.
+   *No target word is revealed here* — the player may not yet know what
+   they're typing, and the HUD must not spoil it.
 2. **Divider** — em-rule flanked by faint gold lines (`flex: 1; height: 1px`).
-3. **Ledger** — up to 4 prior attempts with:
-   - Roman numeral index
-   - Rune string (line-through in crimson if rejected)
-   - Italic word + one-line kenning (`"Flem" · misread kenning`)
-   - Mark column: `✓` verdant, `~` ember, `✗` crimson
-   - Left border stripe in the corresponding colour
-   - Oldest entry at opacity 0.55
+3. **Ledger** — up to 4 prior attempts, each a row of **per-letter score
+   tiles** (Wordle-style) plus, underneath, the resolved word *only if it is
+   known*:
+   - Roman numeral index column (`IV III II I`).
+   - Tiles coloured by `RuneMatchState` (see palette below). One tile per
+     rune typed, minimum 2cqh square.
+   - Subtitle line: italic parchment-coloured word in quotes
+     (`"Forst"`) when the attempt resolved to a known word, or the
+     muted placeholder `— word unknown —` (class `.word.unknown`, lower
+     opacity, wider letter-spacing) when the attempt didn't match a known
+     word. The mockup ships both variants so implementers have a template
+     for each.
+   - Oldest entry at opacity 0.55.
+
+Per-letter scoring palette — mirrors `src/rune_words/battle.rs::RuneMatchState`
+(sRGB floats in source, hex in CSS):
+
+| State     | sRGB (source)           | Hex       | Role                                        |
+| --------- | ----------------------- | --------- | ------------------------------------------- |
+| `Missing` | `(0.78, 0.20, 0.20)`    | `#c73333` | Rune not in the target word                 |
+| `Present` | `(0.85, 0.72, 0.16)`    | `#d9b829` | Rune is in the word but in a different slot |
+| `Correct` | `(0.24, 0.68, 0.32)`    | `#3dad52` | Rune is in the correct slot                 |
+
+Tiles use these as `background`, with a contrasting parchment / ink text
+colour and a 1px dark border to read cleanly against the panel's black
+ground. Keep these hex values in sync with the enum — they are the
+authoritative reference.
 
 ### Book of Acting (right)
 
@@ -153,17 +178,34 @@ A single illuminated page (not a two-page spread — too narrow in the column).
 - **4 `.spell` rows**, each a three-column grid:
   `[dropcap 4cqh] [content 1fr] [sigil 3cqh]`.
   - Dropcap: UnifrakturMaguntia blackletter in `--blood`.
-  - Content: UPPERCASE word (Cormorant Unicase) / runes / italic kenning.
+  - Content: UPPERCASE word (Cormorant Unicase) on top, runes beneath.
+    **No kenning / flavour line** — the word and its runes are the whole
+    entry; anything extra was noise that pulled the eye off gameplay.
   - Sigil: 40px circle with double-ring border, alchemical glyph inside
     (🜂 🜄 ⚔ 🜛). These can be either unicode (simplest) or 24×24 sprites
     if Bevy's font doesn't cover the alchemical block.
 - **Active spell** gets an ember-tinted background, crimson left border,
   inner glow, and a pulsing `☛` pointing-finger to its left.
 
-### Binding Strain (bottom, full width)
+### Binding Strain (bottom, full width) — **TODO placeholder**
 
-Three-column grid:
-`[title + copy] [chain] [count]`.
+> **The rules of the Binding phase are not defined yet.** The section exists
+> in the mockup purely as a visual placeholder so the four-corner layout is
+> legible. Expect the contents below to be replaced wholesale once the real
+> Binding rules are designed.
+
+The mockup shows this by rendering a dashed-ember **TODO banner** above the
+placeholder content:
+
+- `.binding .todo` — full-width banner, dashed ember border, parchment-italic
+  message, solid ember `<span class="badge">TODO</span>` pill at the left.
+- `.binding-wrap.placeholder` — the title/chain/counter row beneath, dropped
+  to `opacity: 0.55` and slightly desaturated to make clear it is not a real
+  feature.
+
+The placeholder visuals (useful as layout reference, not as a spec):
+
+Three-column grid: `[title + copy] [chain] [count]`.
 
 - **Chain** — five `.link` ovals, each 5.2×2.8cqh with 0.38cqh gold border.
   `:nth-child(even)` rotates 90° and `+ .link` gives `margin-left: -1.5cqh`
@@ -175,8 +217,11 @@ Three-column grid:
   - `.link.broken` — crimson border, dark red fill, clip-path splits the
     oval in two halves with a glowing hot-centre `::before`.
 - The counter on the right is a big 3.4cqh crimson Cormorant Unicase
-  `3` followed by a muted ` / 5` small, plus a spaced "✦ strain rising ✦"
-  tag.
+  `3` followed by a muted ` / 5` small. No decorative tag beneath — the
+  placeholder intentionally avoids inventing rules it can't back up.
+
+When implementing: **do not** port the link visuals verbatim. Wait for the
+Binding rules to be specified, then pick the HUD components to match.
 
 ### Rune Keyboard (left column, beneath attempts)
 
@@ -212,9 +257,9 @@ Three staggered rows, matching `src/futhark.rs:38-42`:
   (the bottom-left of the 2×2 sheet). `image-rendering: pixelated`.
 - Breathing ground-shadow, bob keyframes, drifting ember motes, torchlight
   flicker radial gradient.
-- Floating overlays: top-left "ACTING PHASE" pill with a pulsing ember dot,
-  centred name tag (`⸻ the quarry ⸻ / HOARDLING VRASK / threat · iii of v`),
-  bottom-left italic zone caption.
+- Floating overlays: a single top-left "ACTING PHASE" pill with a pulsing
+  ember dot. **No name tag**, **no zone caption** — the enemy's name is
+  already in the combat bar and a zone subtitle added nothing to play.
 
 ---
 
@@ -245,10 +290,11 @@ Existing assets (already in `assets/images/`): `backdrop.png`, `futhark.png`,
 
 **New sprites needed for faithful implementation**:
 
-1. **Binding chain links**, three states — *intact*, *strained*, *broken*.
-   Each ≈52×28px, with alternating rotation handled at layout time. Broken
-   variant includes the crimson glow and split-half clip. These can be a
-   single 3-column sprite-sheet.
+1. **Binding chain links** — *deferred.* The Binding phase is still a TODO
+   placeholder; the chain is only illustrative. Do not commission or port
+   these sprites until the real Binding rules exist. (If kept: three states
+   — *intact*, *strained*, *broken* — each ≈52×28px, with alternating
+   rotation handled at layout time.)
 2. **Parchment texture** — 256×256 tileable, subtle fibre grain. Needed for
    the Book of Acting page background.
 3. **Leather / gold frame** — 9-slice texture (~16px border) for the panels
@@ -311,6 +357,14 @@ vector-feeling HUD. Keep that distinction — don't pixelate the UI.
       not collapse it; layout stagger depends on it.
 - [ ] The crimson "INSCRIBING" pill floats above the active-attempt card
       (negative top). In Bevy: use `PositionType::Absolute` + negative `top`.
+- [ ] The active-attempt card must **never** render the resolved/target word.
+      Only runes + caret. Resolution is shown in the ledger once committed.
+- [ ] Ledger rows render per-letter tiles (`Missing`/`Present`/`Correct`),
+      driven directly by `RuneMatchState`. The word subtitle is optional —
+      show `"Word"` when the attempt matches a known word, the
+      `.word.unknown` placeholder (`— word unknown —`) otherwise.
+- [ ] Skip the Binding Strain panel for now beyond a stubbed region or TODO
+      banner. Implement it once the Binding rules are defined.
 
 ---
 

@@ -444,13 +444,12 @@
   .ledger { list-style: none; display: flex; flex-direction: column; gap: 0.45cqh; flex: 1; }
   .attempt {
     display: grid;
-    grid-template-columns: 1.5cqw 1fr auto 1.5cqw;
+    grid-template-columns: 1.6cqw 1fr;
     gap: 0.8cqw;
     align-items: center;
     padding: 0.55cqh 0.8cqw;
     background: linear-gradient(180deg, rgba(234,217,180,0.05), rgba(234,217,180,0.015));
     border: 1px solid rgba(201,162,75,0.18);
-    border-left: 2px solid transparent;
     position: relative;
   }
   .attempt .idx {
@@ -460,46 +459,45 @@
     letter-spacing: 0.12em;
     text-align: center;
   }
-  .attempt .runes {
-    font-family: 'Segoe UI Historic', 'Noto Sans Runic', serif;
-    font-size: 1.7cqh;
-    letter-spacing: 0.22em;
-    color: var(--parchment);
-    line-height: 1;
+  .attempt .stroke { min-width: 0; }
+  .attempt .tiles {
+    display: flex;
+    gap: 2px;
+    flex-wrap: wrap;
   }
+  /* per-letter score tiles — colors mirror src/rune_words/battle.rs::RuneMatchState */
+  .tile {
+    display: inline-grid;
+    place-items: center;
+    min-width: 2cqh;
+    height: 2cqh;
+    padding: 0 0.3cqh;
+    font-family: 'Segoe UI Historic', 'Noto Sans Runic', serif;
+    font-size: 1.4cqh;
+    line-height: 1;
+    border-radius: 2px;
+    border: 1px solid rgba(0,0,0,0.45);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -1px 0 rgba(0,0,0,0.25);
+    text-shadow: 0 1px 1px rgba(0,0,0,0.4);
+  }
+  .tile.missing { background: #c73333; color: #ffeacc; }           /* srgb(0.78,0.20,0.20) */
+  .tile.present { background: #d9b829; color: #231510; text-shadow: none; } /* srgb(0.85,0.72,0.16) */
+  .tile.correct { background: #3dad52; color: #ffffff; }           /* srgb(0.24,0.68,0.32) */
+
   .attempt .word {
     font-family: 'Cormorant Garamond', serif;
     font-style: italic;
     font-size: 1cqh;
     color: var(--parchment-dark);
-    margin-top: 0.25cqh;
+    margin-top: 0.3cqh;
     letter-spacing: 0.04em;
   }
-  .attempt .mark {
-    font-family: 'Cormorant Unicase', serif;
-    font-size: 1.7cqh;
-    text-align: center;
-    line-height: 1;
-    font-weight: 700;
+  .attempt .word.unknown {
+    color: #7a6238;
+    opacity: 0.75;
+    font-style: italic;
+    letter-spacing: 0.2em;
   }
-
-  .attempt.miss { border-left-color: var(--blood-bright); }
-  .attempt.miss .mark { color: var(--blood-bright); text-shadow: 0 0 10px rgba(193,53,70,0.5); }
-  .attempt.miss .runes {
-    text-decoration: line-through;
-    text-decoration-color: rgba(193,53,70,0.75);
-    text-decoration-thickness: 2px;
-    color: var(--parchment-dark);
-  }
-
-  .attempt.partial { border-left-color: var(--ember); }
-  .attempt.partial .mark { color: var(--ember); text-shadow: 0 0 10px rgba(212,122,58,0.5); }
-
-  .attempt.hit {
-    border-left-color: var(--verdant);
-    background: linear-gradient(180deg, rgba(139,167,74,0.12), rgba(139,167,74,0.03));
-  }
-  .attempt.hit .mark { color: var(--verdant); text-shadow: 0 0 10px rgba(139,167,74,0.55); }
   .attempt.oldest { opacity: 0.55; }
 
   /* ═══════ CENTER — BATTLE ARENA ═══════ */
@@ -1072,6 +1070,46 @@
     z-index: 1;
   }
 
+  /* TODO banner — rules not yet defined */
+  .binding .todo {
+    display: flex;
+    align-items: center;
+    gap: 0.8cqw;
+    padding: 0.55cqh 1cqw;
+    margin-bottom: 0.8cqh;
+    background:
+      linear-gradient(180deg, rgba(212,122,58,0.22), rgba(212,122,58,0.06)),
+      linear-gradient(180deg, rgba(30,20,12,0.9), rgba(14,9,6,0.95));
+    border: 1px dashed var(--ember);
+    box-shadow: inset 0 1px 0 rgba(240,212,138,0.18);
+  }
+  .binding .todo .badge {
+    font-family: 'IM Fell DW Pica SC', serif;
+    font-size: 0.95cqh;
+    letter-spacing: 0.35em;
+    color: var(--night);
+    background: var(--ember);
+    padding: 0.2cqh 0.6cqw;
+    text-transform: uppercase;
+    text-shadow: 0 1px 0 rgba(255,220,180,0.55);
+    box-shadow: 0 0 1cqh rgba(212,122,58,0.55), inset 0 1px 0 rgba(255,240,200,0.35);
+  }
+  .binding .todo .msg {
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-size: 1.15cqh;
+    color: var(--parchment);
+    letter-spacing: 0.04em;
+    line-height: 1.25;
+  }
+  .binding .todo .msg b {
+    font-style: normal;
+    color: var(--ember);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+  }
+  .binding-wrap.placeholder { opacity: 0.55; filter: saturate(0.8); }
+
   /* ═══════ KEYBOARD (beneath inscribed, staggered) ═══════ */
   .keyboard-wrap {
     position: relative;
@@ -1177,8 +1215,7 @@
     <div class="combatant player">
       <div class="portrait player">Ꭿ</div>
       <div class="stats">
-        <h1>Aëther of the Ninth</h1>
-        <div class="title">Apprentice Runewarden · lvl iv</div>
+        <h1>Aëther</h1>
         <div class="hp-bar">
           <div class="hp-fill player"></div>
           <div class="ticks"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
@@ -1190,7 +1227,6 @@
     <div class="phase">
       <div class="label">⸻ current phase ⸻</div>
       <div class="name">Acting</div>
-      <div class="rule">scribe the rune to strike</div>
       <div class="pips">
         <span title="Reacting"></span>
         <span class="active" title="Acting"></span>
@@ -1201,8 +1237,7 @@
     <div class="combatant enemy">
       <div class="portrait enemy">ᚣ</div>
       <div class="stats">
-        <h1>Hoardling Vrask</h1>
-        <div class="title">Gold-gnawer of the Deep Warren</div>
+        <h1>Hoardling</h1>
         <div class="hp-bar">
           <div class="hp-fill enemy"></div>
           <div class="ticks"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
@@ -1224,50 +1259,64 @@
     </div>
 
     <div class="active-attempt">
-      <div>
-        <div class="runes">ᛖᛗᛒᛖ<span class="caret">▍</span></div>
-        <div class="progress">composing · 4 of 5 glyphs</div>
-      </div>
-      <div class="meta">
-        <div class="label">target</div>
-        <div class="val">EMBER</div>
-      </div>
+      <div class="runes">ᛖᛗᛒᛖ<span class="caret">▍</span></div>
+      <div class="progress">composing · 4 glyphs inscribed</div>
     </div>
 
     <div class="divider"><span>previous strokes</span></div>
 
     <ul class="ledger">
-      <li class="attempt partial">
+      <li class="attempt">
         <div class="idx">IV.</div>
-        <div>
-          <div class="runes">ᚠᛚᛖᛗ</div>
-          <div class="word">“Flem” · misread kenning</div>
+        <div class="stroke">
+          <div class="tiles">
+            <span class="tile missing">ᚠ</span>
+            <span class="tile missing">ᛚ</span>
+            <span class="tile present">ᛖ</span>
+            <span class="tile present">ᛗ</span>
+          </div>
+          <div class="word">“Flem”</div>
         </div>
-        <div class="mark">~</div>
       </li>
-      <li class="attempt miss">
+      <li class="attempt">
         <div class="idx">III.</div>
-        <div>
-          <div class="runes">ᛋᛏᛟᚱᚾ</div>
-          <div class="word">“Storn” · unknown to the sigils</div>
+        <div class="stroke">
+          <div class="tiles">
+            <span class="tile missing">ᛋ</span>
+            <span class="tile missing">ᛏ</span>
+            <span class="tile present">ᛟ</span>
+            <span class="tile missing">ᚱ</span>
+            <span class="tile missing">ᚾ</span>
+          </div>
+          <div class="word unknown">— word unknown —</div>
         </div>
-        <div class="mark">✗</div>
       </li>
-      <li class="attempt partial">
+      <li class="attempt">
         <div class="idx">II.</div>
-        <div>
-          <div class="runes">ᚠᛟᚱᛋᛏ</div>
-          <div class="word">“Forst” · near-kin to Frost</div>
+        <div class="stroke">
+          <div class="tiles">
+            <span class="tile correct">ᚠ</span>
+            <span class="tile missing">ᛟ</span>
+            <span class="tile correct">ᚱ</span>
+            <span class="tile missing">ᛋ</span>
+            <span class="tile correct">ᛏ</span>
+          </div>
+          <div class="word">“Forst”</div>
         </div>
-        <div class="mark">~</div>
       </li>
-      <li class="attempt hit oldest">
+      <li class="attempt oldest">
         <div class="idx">I.</div>
-        <div>
-          <div class="runes">ᚲᛚᛖᚨᚢᛖ</div>
-          <div class="word">“Cleave” · struck true</div>
+        <div class="stroke">
+          <div class="tiles">
+            <span class="tile correct">ᚲ</span>
+            <span class="tile correct">ᛚ</span>
+            <span class="tile correct">ᛖ</span>
+            <span class="tile correct">ᚨ</span>
+            <span class="tile correct">ᚢ</span>
+            <span class="tile correct">ᛖ</span>
+          </div>
+          <div class="word">“Cleave”</div>
         </div>
-        <div class="mark">✓</div>
       </li>
     </ul>
   </section>
@@ -1317,19 +1366,8 @@
       <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
     </div>
 
-    <div class="tag">
-      <div class="ring">⸻ the quarry ⸻</div>
-      <div class="name">Hoardling Vrask</div>
-      <div class="threat">threat · iii of v</div>
-    </div>
-
     <div class="shadow"></div>
     <div class="npc" role="img" aria-label="Goblin in acting pose"></div>
-
-    <div class="zone">
-      <b>⸻ glade of the sunken wardings ⸻</b>
-      the quarry strains against the half-drawn circle.
-    </div>
   </section>
 
   <!-- ═════════ RIGHT — BOOK OF ACTING ═════════ -->
@@ -1349,7 +1387,6 @@
           <div class="content">
             <div class="word">Ember</div>
             <div class="runes">ᛖᛗᛒᛖᚱ</div>
-            <div class="note">a kindling ward; scorches the near foe.</div>
           </div>
           <div class="sigil">🜂</div>
         </div>
@@ -1359,7 +1396,6 @@
           <div class="content">
             <div class="word">Frost</div>
             <div class="runes">ᚠᚱᛟᛋᛏ</div>
-            <div class="note">a latticed chill; slows the quick of limb.</div>
           </div>
           <div class="sigil">🜄</div>
         </div>
@@ -1369,7 +1405,6 @@
           <div class="content">
             <div class="word">Cleave</div>
             <div class="runes">ᚲᛚᛖᚨᚢᛖ</div>
-            <div class="note">a sundering blow; rends the warded hide.</div>
           </div>
           <div class="sigil">⚔</div>
         </div>
@@ -1379,7 +1414,6 @@
           <div class="content">
             <div class="word">Shield</div>
             <div class="runes">ᛋᚺᛁᛖᛚᛞ</div>
-            <div class="note">a silvered aegis; turns the first wound aside.</div>
           </div>
           <div class="sigil">🜛</div>
         </div>
@@ -1390,23 +1424,28 @@
   <!-- ═════════ BINDING STRAIN ═════════ -->
   <section class="binding">
     <div class="corners"><span></span><span></span><span></span><span></span></div>
-    <div class="binding-wrap">
+
+    <div class="todo">
+      <span class="badge">TODO</span>
+      <span class="msg">Binding Strain rules are <b>not yet defined</b>. The visual below is a placeholder — specific, real rules will replace it.</span>
+    </div>
+
+    <div class="binding-wrap placeholder">
       <div>
         <div class="title">Binding Strain</div>
-        <div class="sub">the quarry writhes within the circle — three shackles yet hold.</div>
+        <div class="sub">placeholder copy — attempts remaining before the target breaks out.</div>
       </div>
 
-      <div class="chain" aria-label="5 bindings: 2 broken, 1 strained, 2 intact">
-        <div class="link broken"  title="broken"></div>
-        <div class="link broken"  title="broken"></div>
-        <div class="link strained" title="straining"></div>
-        <div class="link"          title="intact"></div>
-        <div class="link"          title="intact"></div>
+      <div class="chain" aria-label="placeholder chain">
+        <div class="link broken"></div>
+        <div class="link broken"></div>
+        <div class="link strained"></div>
+        <div class="link"></div>
+        <div class="link"></div>
       </div>
 
       <div class="rhs">
         <div class="count">3<small> / 5</small></div>
-        <div class="tag">✦ strain rising ✦</div>
       </div>
     </div>
   </section>
