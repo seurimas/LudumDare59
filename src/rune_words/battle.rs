@@ -2,7 +2,9 @@ use bevy::ecs::message::MessageWriter;
 use bevy::prelude::*;
 use std::collections::{HashMap, HashSet};
 
-use super::rune_slots::{RuneSlot, RuneSlotConfig, RuneSlotForegroundSet, spawn_rune_word};
+use super::rune_slots::{
+    RuneSlot, RuneSlotBackground, RuneSlotConfig, RuneSlotForegroundSet, spawn_rune_word,
+};
 use crate::{GameAssets, futhark};
 
 pub const ACTIVE_ROW_TOP: f32 = 236.0;
@@ -54,6 +56,37 @@ pub struct BattleState {
     pub resolved_rows: usize,
 }
 
+#[derive(Clone)]
+struct QueuedLetterPlaybackStep {
+    slot_entity: Entity,
+    color: Color,
+    handle: Option<Handle<AudioSource>>,
+    duration_seconds: f32,
+}
+
+#[derive(Clone)]
+struct QueuedRowGrading {
+    row_id: u32,
+    row_slots: Vec<Entity>,
+    slot_results: Vec<(Entity, Color)>,
+    steps: Vec<QueuedLetterPlaybackStep>,
+    current_step: usize,
+    elapsed_seconds: f32,
+    current_step_duration_seconds: f32,
+    started: bool,
+}
+
+#[derive(Resource, Default)]
+pub struct PendingRowGrading {
+    current: Option<QueuedRowGrading>,
+}
+
+impl PendingRowGrading {
+    pub fn is_active(&self) -> bool {
+        self.current.is_some()
+    }
+}
+
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BattleRuneSlot {
     pub row_id: u32,
@@ -71,6 +104,7 @@ pub struct RowResolved(pub u32);
 
 pub fn configure_battle(app: &mut App) {
     app.init_resource::<BattleState>();
+    app.init_resource::<PendingRowGrading>();
     app.add_message::<RowResolved>();
     app.configure_sets(
         Update,
@@ -78,11 +112,217 @@ pub fn configure_battle(app: &mut App) {
     );
     app.add_systems(
         Update,
-        (animate_resolved_rows, check_row_animation_done)
+        (
+            tick_pending_row_grading,
+            animate_resolved_rows,
+            check_row_animation_done,
+        )
             .chain()
             .in_set(BattleSet::CheckAnimations),
     );
     super::battle_states::configure_battle_states(app);
+}
+
+fn clip_duration(p: &crate::audio::ProcessedAudio) -> f32 {
+    if p.channels == 0 || p.sample_rate == 0 {
+        return 0.0;
+    }
+    p.samples.len() as f32 / (p.channels as f32 * p.sample_rate as f32)
+}
+
+pub fn queue_row_grading_playback(
+    row_id: u32,
+    row_slots: &[Entity],
+    guess: &[Option<char>],
+    results: &[RuneMatchState],
+    pending: &mut PendingRowGrading,
+    prebaked_audio: Option<&crate::futhark::PrebakedFutharkConversationalAudio>,
+    baked_samples: Option<&crate::futhark::BakedAudioSamples>,
+) {
+    let slot_results: Vec<(Entity, Color)> = row_slots
+        .iter()
+        .copied()
+        .zip(results.iter().copied())
+        .map(|(entity, result)| (entity, result.background_color()))
+        .collect();
+
+    let mut steps = Vec::new();
+    for ((entity, guess_char), result) in row_slots
+        .iter()
+        .copied()
+        .zip(guess.iter().copied())
+        .zip(results.iter().copied())
+    {
+        let Some(letter) = guess_char else {
+            continue;
+        };
+
+        let Some(rune_index) = futhark::letter_to_index(letter) else {
+            continue;
+        };
+
+        let handle = prebaked_audio
+            .and_then(|audio| audio.handles_by_index.get(rune_index))
+            .and_then(|handles| handles.first())
+            .cloned();
+        let duration_seconds = baked_samples
+            .and_then(|samples| samples.conversational.get(rune_index))
+            .and_then(|clips| clips.first())
+            .map(clip_duration)
+            .unwrap_or(0.0);
+
+        steps.push(QueuedLetterPlaybackStep {
+            slot_entity: entity,
+            color: result.background_color(),
+            handle,
+            duration_seconds,
+        });
+    }
+
+    pending.current = Some(QueuedRowGrading {
+        row_id,
+        row_slots: row_slots.to_vec(),
+        slot_results,
+        steps,
+        current_step: 0,
+        elapsed_seconds: 0.0,
+        current_step_duration_seconds: 0.0,
+        started: false,
+    });
+}
+
+fn tint_slot(
+    slot_entity: Entity,
+    color: Color,
+    slot_children: &Query<&Children>,
+    backgrounds: &mut Query<&mut RuneSlotBackground>,
+) {
+    if let Ok(children) = slot_children.get(slot_entity) {
+        for child in children.iter() {
+            if let Ok(mut bg) = backgrounds.get_mut(child) {
+                bg.base_color = color;
+            }
+        }
+    }
+}
+
+fn begin_row_resolution_animation(
+    commands: &mut Commands,
+    battle_state: &mut BattleState,
+    row_id: u32,
+    row_slots: &[Entity],
+    slot_nodes: &Query<(Entity, &Node), With<BattleRuneSlot>>,
+) {
+    let active_set: HashSet<Entity> = row_slots.iter().copied().collect();
+
+    for entity in row_slots.iter().copied() {
+        let start_top = match slot_nodes.get(entity).map(|(_, n)| n.top) {
+            Ok(Val::Px(t)) => t,
+            _ => ACTIVE_ROW_TOP,
+        };
+        commands.entity(entity).insert(BattleRowMotion {
+            start_top,
+            end_top: start_top - ROW_RISE,
+            elapsed_seconds: 0.0,
+        });
+    }
+
+    push_all_non_active_slots_up(commands, &active_set, slot_nodes);
+
+    battle_state.pending_resolved_row = Some(row_id);
+    battle_state.pending_settle_frames = 1;
+}
+
+fn tick_pending_row_grading(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut battle_state: ResMut<BattleState>,
+    mut pending: ResMut<PendingRowGrading>,
+    slot_nodes: Query<(Entity, &Node), With<BattleRuneSlot>>,
+    slot_children: Query<&Children>,
+    mut backgrounds: Query<&mut RuneSlotBackground>,
+) {
+    if battle_state.pending_resolved_row.is_some() {
+        return;
+    }
+
+    let should_finalize = {
+        let Some(queued) = pending.current.as_mut() else {
+            return;
+        };
+
+        if queued.steps.is_empty() {
+            true
+        } else {
+            if !queued.started {
+                if let Some(step) = queued.steps.first() {
+                    tint_slot(
+                        step.slot_entity,
+                        step.color,
+                        &slot_children,
+                        &mut backgrounds,
+                    );
+                    if let Some(handle) = step.handle.clone() {
+                        commands.spawn((
+                            AudioPlayer::<AudioSource>(handle),
+                            PlaybackSettings::DESPAWN,
+                        ));
+                    }
+                    queued.current_step_duration_seconds = step.duration_seconds;
+                    queued.elapsed_seconds = 0.0;
+                    queued.started = true;
+                }
+                return;
+            }
+
+            queued.elapsed_seconds += time.delta_secs();
+            if queued.elapsed_seconds < queued.current_step_duration_seconds {
+                return;
+            }
+
+            queued.current_step += 1;
+            if queued.current_step >= queued.steps.len() {
+                true
+            } else {
+                let step = &queued.steps[queued.current_step];
+                tint_slot(
+                    step.slot_entity,
+                    step.color,
+                    &slot_children,
+                    &mut backgrounds,
+                );
+                if let Some(handle) = step.handle.clone() {
+                    commands.spawn((
+                        AudioPlayer::<AudioSource>(handle),
+                        PlaybackSettings::DESPAWN,
+                    ));
+                }
+                queued.current_step_duration_seconds = step.duration_seconds;
+                queued.elapsed_seconds = 0.0;
+                return;
+            }
+        }
+    };
+
+    if !should_finalize {
+        return;
+    }
+
+    let Some(queued) = pending.current.take() else {
+        return;
+    };
+
+    for (entity, color) in queued.slot_results {
+        tint_slot(entity, color, &slot_children, &mut backgrounds);
+    }
+
+    begin_row_resolution_animation(
+        &mut commands,
+        &mut battle_state,
+        queued.row_id,
+        &queued.row_slots,
+        &slot_nodes,
+    );
 }
 
 fn animate_resolved_rows(

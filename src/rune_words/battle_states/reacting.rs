@@ -1,15 +1,12 @@
 use bevy::ecs::message::{MessageReader, MessageWriter};
 use bevy::prelude::*;
-use std::collections::HashSet;
 
 use crate::rune_words::battle::{
-    ACTIVE_ROW_TOP, BattlePhase, BattleRowMotion, BattleRuneSlot, BattleSet, BattleState, ROW_LEFT,
-    ROW_RISE, RowResolved, RuneMatchState, collect_guess_submission, push_all_non_active_slots_up,
+    ACTIVE_ROW_TOP, BattlePhase, BattleRuneSlot, BattleSet, BattleState, PendingRowGrading,
+    ROW_LEFT, RowResolved, RuneMatchState, collect_guess_submission, queue_row_grading_playback,
     reset_battle_state, score_guess_submission, spawn_battle_row,
 };
-use crate::rune_words::rune_slots::{
-    ActiveRuneSlot, EnterActiveRuneWord, PlayFutharkLetters, RuneSlot, RuneSlotBackground,
-};
+use crate::rune_words::rune_slots::{ActiveRuneSlot, EnterActiveRuneWord, RuneSlot};
 use crate::{GameAssets, dictionary};
 
 #[derive(bevy::ecs::message::Message, Clone, Debug)]
@@ -30,6 +27,7 @@ pub struct ReactingData {
     pub time_limit: f32,
     pub elapsed: f32,
     pub active: bool,
+    pub pending_success: bool,
     pub timer_display: Option<Entity>,
     pub target_word_display: Option<Entity>,
 }
@@ -100,6 +98,7 @@ fn start_reacting(
     reacting_data.time_limit = time_limit;
     reacting_data.elapsed = 0.0;
     reacting_data.active = true;
+    reacting_data.pending_success = false;
 
     let row = spawn_battle_row(
         &mut commands,
@@ -191,25 +190,25 @@ fn tick_reacting_timer(
 }
 
 fn score_reacting_row_on_enter(
-    mut commands: Commands,
     mut enter_events: MessageReader<EnterActiveRuneWord>,
     mut battle_state: ResMut<BattleState>,
     mut active_slot: ResMut<ActiveRuneSlot>,
     mut reacting_data: ResMut<ReactingData>,
+    mut pending_grading: ResMut<PendingRowGrading>,
     rune_slots: Query<&RuneSlot>,
     battle_slots: Query<&BattleRuneSlot>,
-    slot_nodes: Query<(Entity, &Node), With<BattleRuneSlot>>,
-    slot_children: Query<&Children>,
-    mut backgrounds: Query<&mut RuneSlotBackground>,
-    mut succeeded: MessageWriter<ReactingSucceeded>,
-    mut play_word: MessageWriter<PlayFutharkLetters>,
+    prebaked_audio: Option<Res<crate::futhark::PrebakedFutharkConversationalAudio>>,
+    baked_samples: Option<Res<crate::futhark::BakedAudioSamples>>,
 ) {
     if enter_events.is_empty() {
         return;
     }
     enter_events.clear();
 
-    if battle_state.pending_resolved_row.is_some() || !reacting_data.active {
+    if battle_state.pending_resolved_row.is_some()
+        || pending_grading.is_active()
+        || !reacting_data.active
+    {
         return;
     }
 
@@ -228,44 +227,27 @@ fn score_reacting_row_on_enter(
     };
     let row_id = battle_slot.row_id;
 
-    let active_set: HashSet<Entity> = battle_state.active_row_slots.iter().copied().collect();
     let results = score_guess_submission(&guess, &target.letters);
 
     let all_correct = results.iter().all(|r| matches!(r, RuneMatchState::Correct));
 
+    queue_row_grading_playback(
+        row_id,
+        &battle_state.active_row_slots,
+        &guess,
+        &results,
+        &mut pending_grading,
+        prebaked_audio.as_deref(),
+        baked_samples.as_deref(),
+    );
+
     active_slot.entity = None;
-
-    for (entity, result) in battle_state.active_row_slots.iter().copied().zip(results) {
-        if let Ok(children) = slot_children.get(entity) {
-            for child in children.iter() {
-                if let Ok(mut bg) = backgrounds.get_mut(child) {
-                    bg.base_color = result.background_color();
-                }
-            }
-        }
-        let start_top = match slot_nodes.get(entity).map(|(_, n)| n.top) {
-            Ok(Val::Px(t)) => t,
-            _ => ACTIVE_ROW_TOP,
-        };
-        commands.entity(entity).insert(BattleRowMotion {
-            start_top,
-            end_top: start_top - ROW_RISE,
-            elapsed_seconds: 0.0,
-        });
-    }
-
-    push_all_non_active_slots_up(&mut commands, &active_set, &slot_nodes);
-
+    reacting_data.pending_success = all_correct;
     if all_correct {
         reacting_data.active = false;
-        battle_state.phase = BattlePhase::Idle;
-        play_word.write(PlayFutharkLetters(target.letters.clone()));
-        succeeded.write(ReactingSucceeded);
     }
 
     battle_state.active_row_slots.clear();
-    battle_state.pending_resolved_row = Some(row_id);
-    battle_state.pending_settle_frames = 1;
 }
 
 fn on_reacting_row_resolved(
@@ -274,7 +256,8 @@ fn on_reacting_row_resolved(
     mut battle_state: ResMut<BattleState>,
     mut active_slot: ResMut<ActiveRuneSlot>,
     mut row_resolved: MessageReader<RowResolved>,
-    reacting_data: Res<ReactingData>,
+    mut reacting_data: ResMut<ReactingData>,
+    mut succeeded: MessageWriter<ReactingSucceeded>,
 ) {
     let Some(game_assets) = game_assets else {
         return;
@@ -283,6 +266,14 @@ fn on_reacting_row_resolved(
         return;
     }
     row_resolved.clear();
+
+    if reacting_data.pending_success {
+        reacting_data.pending_success = false;
+        battle_state.phase = BattlePhase::Idle;
+        active_slot.entity = None;
+        succeeded.write(ReactingSucceeded);
+        return;
+    }
 
     // Only spawn another row if still active (not yet succeeded or timed out).
     if !reacting_data.active {

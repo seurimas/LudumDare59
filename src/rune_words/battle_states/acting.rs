@@ -1,14 +1,13 @@
 use bevy::ecs::message::{MessageReader, MessageWriter};
 use bevy::prelude::*;
-use std::collections::HashSet;
 
 use crate::rune_words::battle::{
-    ACTIVE_ROW_TOP, BattlePhase, BattleRowMotion, BattleRuneSlot, BattleSet, BattleState, ROW_LEFT,
-    ROW_RISE, RowResolved, RuneMatchState, collect_guess_submission, push_all_non_active_slots_up,
+    ACTIVE_ROW_TOP, BattlePhase, BattleRuneSlot, BattleSet, BattleState, PendingRowGrading,
+    RowResolved, RuneMatchState, collect_guess_submission, queue_row_grading_playback,
     reset_battle_state, score_guess_submission, spawn_battle_row,
 };
 use crate::rune_words::rune_slots::{
-    ActiveRuneSlot, EnterActiveRuneWord, PlayFutharkLetters, RuneSlot, RuneSlotBackground,
+    ActiveRuneSlot, EnterActiveRuneWord, RuneSlot,
 };
 use crate::{GameAssets, dictionary};
 
@@ -203,23 +202,22 @@ fn first_four_book_entries(
 }
 
 fn score_acting_row_on_enter(
-    mut commands: Commands,
     mut enter_events: MessageReader<EnterActiveRuneWord>,
     mut battle_state: ResMut<BattleState>,
     mut active_slot: ResMut<ActiveRuneSlot>,
     mut acting_data: ResMut<ActingData>,
+    mut pending_grading: ResMut<PendingRowGrading>,
     rune_slots: Query<&RuneSlot>,
     battle_slots: Query<&BattleRuneSlot>,
-    slot_nodes: Query<(Entity, &Node), With<BattleRuneSlot>>,
-    slot_children: Query<&Children>,
-    mut backgrounds: Query<&mut RuneSlotBackground>,
+    prebaked_audio: Option<Res<crate::futhark::PrebakedFutharkConversationalAudio>>,
+    baked_samples: Option<Res<crate::futhark::BakedAudioSamples>>,
 ) {
     if enter_events.is_empty() {
         return;
     }
     enter_events.clear();
 
-    if battle_state.pending_resolved_row.is_some() {
+    if battle_state.pending_resolved_row.is_some() || pending_grading.is_active() {
         return;
     }
 
@@ -242,77 +240,18 @@ fn score_acting_row_on_enter(
         .iter()
         .filter(|r| matches!(r, RuneMatchState::Correct))
         .count();
-    let present = best_results
-        .iter()
-        .filter(|r| matches!(r, RuneMatchState::Present))
-        .count();
-    let missing = best_results
-        .iter()
-        .filter(|r| matches!(r, RuneMatchState::Missing))
-        .count();
 
-    let active_set: HashSet<Entity> = battle_state.active_row_slots.iter().copied().collect();
     active_slot.entity = None;
 
-    let row_top = slot_nodes
-        .get(first_entity)
-        .map(|(_, n)| match n.top {
-            Val::Px(t) => t,
-            _ => ACTIVE_ROW_TOP,
-        })
-        .unwrap_or(ACTIVE_ROW_TOP);
-
-    for (entity, result) in battle_state
-        .active_row_slots
-        .iter()
-        .copied()
-        .zip(best_results.iter().copied())
-    {
-        if let Ok(children) = slot_children.get(entity) {
-            for child in children.iter() {
-                if let Ok(mut bg) = backgrounds.get_mut(child) {
-                    bg.base_color = result.background_color();
-                }
-            }
-        }
-        let start_top = match slot_nodes.get(entity).map(|(_, n)| n.top) {
-            Ok(Val::Px(t)) => t,
-            _ => ACTIVE_ROW_TOP,
-        };
-        commands.entity(entity).insert(BattleRowMotion {
-            start_top,
-            end_top: start_top - ROW_RISE,
-            elapsed_seconds: 0.0,
-        });
-    }
-
-    push_all_non_active_slots_up(&mut commands, &active_set, &slot_nodes);
-
-    let label_top = row_top + 52.0;
-    let label_entity = commands
-        .spawn((
-            ActingCountLabel,
-            BattleRuneSlot { row_id },
-            BattleRowMotion {
-                start_top: label_top,
-                end_top: label_top - ROW_RISE,
-                elapsed_seconds: 0.0,
-            },
-            Text::new(format!("{}✓  {}~  {}✗", correct, present, missing)),
-            TextFont {
-                font_size: 20.0,
-                ..default()
-            },
-            TextColor(Color::WHITE),
-            Node {
-                position_type: PositionType::Absolute,
-                left: Val::Px(ROW_LEFT),
-                top: Val::Px(label_top),
-                ..default()
-            },
-        ))
-        .id();
-    let _ = label_entity;
+    queue_row_grading_playback(
+        row_id,
+        &battle_state.active_row_slots,
+        &guess,
+        &best_results,
+        &mut pending_grading,
+        prebaked_audio.as_deref(),
+        baked_samples.as_deref(),
+    );
 
     acting_data.pending_success = correct >= 2;
     if acting_data.pending_success {
@@ -320,8 +259,6 @@ fn score_acting_row_on_enter(
     }
 
     battle_state.active_row_slots.clear();
-    battle_state.pending_resolved_row = Some(row_id);
-    battle_state.pending_settle_frames = 1;
 }
 
 fn on_acting_row_resolved(
@@ -332,7 +269,6 @@ fn on_acting_row_resolved(
     mut row_resolved: MessageReader<RowResolved>,
     mut acting_data: ResMut<ActingData>,
     mut succeeded: MessageWriter<ActingSucceeded>,
-    mut play_word: MessageWriter<PlayFutharkLetters>,
 ) {
     let Some(game_assets) = game_assets else {
         return;
@@ -355,7 +291,6 @@ fn on_acting_row_resolved(
         });
         acting_data.pending_success = false;
         battle_state.phase = BattlePhase::Idle;
-        play_word.write(PlayFutharkLetters(matched.letters.clone()));
         succeeded.write(ActingSucceeded {
             matched,
             results: Vec::new(),

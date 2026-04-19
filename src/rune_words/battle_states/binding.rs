@@ -1,15 +1,12 @@
 use bevy::ecs::message::{MessageReader, MessageWriter};
 use bevy::prelude::*;
-use std::collections::HashSet;
 
 use crate::rune_words::battle::{
-    ACTIVE_ROW_TOP, BattlePhase, BattleRowMotion, BattleRuneSlot, BattleSet, BattleState, ROW_RISE,
-    RowResolved, RuneMatchState, collect_guess_submission, push_all_non_active_slots_up,
+    ACTIVE_ROW_TOP, BattlePhase, BattleRuneSlot, BattleSet, BattleState, PendingRowGrading,
+    RowResolved, RuneMatchState, collect_guess_submission, queue_row_grading_playback,
     reset_battle_state, score_guess_submission, spawn_battle_row,
 };
-use crate::rune_words::rune_slots::{
-    ActiveRuneSlot, EnterActiveRuneWord, PlayFutharkLetters, RuneSlot, RuneSlotBackground,
-};
+use crate::rune_words::rune_slots::{ActiveRuneSlot, EnterActiveRuneWord, RuneSlot};
 use crate::{GameAssets, dictionary};
 
 #[derive(bevy::ecs::message::Message, Clone, Debug)]
@@ -77,23 +74,22 @@ fn start_binding(
 }
 
 fn score_binding_row_on_enter(
-    mut commands: Commands,
     mut enter_events: MessageReader<EnterActiveRuneWord>,
     mut battle_state: ResMut<BattleState>,
     mut active_slot: ResMut<ActiveRuneSlot>,
     mut binding_data: ResMut<BindingData>,
+    mut pending_grading: ResMut<PendingRowGrading>,
     rune_slots: Query<&RuneSlot>,
     battle_slots: Query<&BattleRuneSlot>,
-    slot_nodes: Query<(Entity, &Node), With<BattleRuneSlot>>,
-    slot_children: Query<&Children>,
-    mut backgrounds: Query<&mut RuneSlotBackground>,
+    prebaked_audio: Option<Res<crate::futhark::PrebakedFutharkConversationalAudio>>,
+    baked_samples: Option<Res<crate::futhark::BakedAudioSamples>>,
 ) {
     if enter_events.is_empty() {
         return;
     }
     enter_events.clear();
 
-    if battle_state.pending_resolved_row.is_some() {
+    if battle_state.pending_resolved_row.is_some() || pending_grading.is_active() {
         return;
     }
 
@@ -112,37 +108,23 @@ fn score_binding_row_on_enter(
     };
     let row_id = battle_slot.row_id;
 
-    let active_set: HashSet<Entity> = battle_state.active_row_slots.iter().copied().collect();
     let results = score_guess_submission(&guess, &target.letters);
     let all_correct = results.iter().all(|r| matches!(r, RuneMatchState::Correct));
 
+    queue_row_grading_playback(
+        row_id,
+        &battle_state.active_row_slots,
+        &guess,
+        &results,
+        &mut pending_grading,
+        prebaked_audio.as_deref(),
+        baked_samples.as_deref(),
+    );
+
     active_slot.entity = None;
-
-    for (entity, result) in battle_state.active_row_slots.iter().copied().zip(results) {
-        if let Ok(children) = slot_children.get(entity) {
-            for child in children.iter() {
-                if let Ok(mut bg) = backgrounds.get_mut(child) {
-                    bg.base_color = result.background_color();
-                }
-            }
-        }
-        let start_top = match slot_nodes.get(entity).map(|(_, n)| n.top) {
-            Ok(Val::Px(t)) => t,
-            _ => ACTIVE_ROW_TOP,
-        };
-        commands.entity(entity).insert(BattleRowMotion {
-            start_top,
-            end_top: start_top - ROW_RISE,
-            elapsed_seconds: 0.0,
-        });
-    }
-
-    push_all_non_active_slots_up(&mut commands, &active_set, &slot_nodes);
 
     binding_data.pending_success = all_correct;
     battle_state.active_row_slots.clear();
-    battle_state.pending_resolved_row = Some(row_id);
-    battle_state.pending_settle_frames = 1;
 }
 
 fn on_binding_row_resolved(
@@ -153,7 +135,6 @@ fn on_binding_row_resolved(
     mut row_resolved: MessageReader<RowResolved>,
     mut binding_data: ResMut<BindingData>,
     mut succeeded: MessageWriter<BindingSucceeded>,
-    mut play_word: MessageWriter<PlayFutharkLetters>,
 ) {
     let Some(game_assets) = game_assets else {
         return;
@@ -171,7 +152,6 @@ fn on_binding_row_resolved(
         binding_data.pending_success = false;
         battle_state.phase = BattlePhase::Idle;
         active_slot.entity = None;
-        play_word.write(PlayFutharkLetters(target.letters.clone()));
         succeeded.write(BindingSucceeded);
         return;
     }
@@ -192,8 +172,10 @@ fn on_binding_row_resolved(
 mod tests {
     use super::*;
     use crate::futhark;
-    use crate::rune_words::battle::{ACTIVE_ROW_TOP, ROW_RISE, RuneMatchState, configure_battle};
-    use crate::rune_words::rune_slots::configure_rune_slots;
+    use crate::rune_words::battle::{
+        ACTIVE_ROW_TOP, PendingRowGrading, ROW_RISE, RuneMatchState, configure_battle,
+    };
+    use crate::rune_words::rune_slots::{RuneSlotBackground, configure_rune_slots};
     use bevy::time::TimeUpdateStrategy;
     use std::time::Duration;
 
@@ -263,12 +245,23 @@ mod tests {
         app.world_mut().write_message(EnterActiveRuneWord);
         app.update();
 
-        assert!(
-            app.world()
+        let mut saw_animation = false;
+        for _ in 0..24 {
+            let is_animating = app
+                .world()
                 .resource::<BattleState>()
                 .pending_resolved_row
-                .is_some(),
-            "row should be animating after Enter"
+                .is_some();
+            if is_animating {
+                saw_animation = true;
+                break;
+            }
+            app.update();
+        }
+
+        assert!(
+            saw_animation,
+            "row should begin animating after typed letters are graded"
         );
 
         let first_bg_color = {
@@ -288,7 +281,21 @@ mod tests {
         };
         assert_eq!(first_bg_color, RuneMatchState::Correct.background_color());
 
-        for _ in 0..5 {
+        for _ in 0..24 {
+            if app
+                .world()
+                .resource::<BattleState>()
+                .pending_resolved_row
+                .is_none()
+                && !app.world().resource::<PendingRowGrading>().is_active()
+                && !app
+                    .world()
+                    .resource::<BattleState>()
+                    .active_row_slots
+                    .is_empty()
+            {
+                break;
+            }
             app.update();
         }
         let battle_state = app.world().resource::<BattleState>();
@@ -319,7 +326,16 @@ mod tests {
 
         app.world_mut().write_message(EnterActiveRuneWord);
         app.update();
-        for _ in 0..5 {
+
+        for _ in 0..24 {
+            if !app
+                .world()
+                .resource::<BattleState>()
+                .active_row_slots
+                .is_empty()
+            {
+                break;
+            }
             app.update();
         }
 
@@ -328,6 +344,7 @@ mod tests {
             .resource::<BattleState>()
             .active_row_slots
             .clone();
+        assert!(!second_row_slots.is_empty(), "second row should be spawned");
         app.world_mut()
             .entity_mut(second_row_slots[0])
             .get_mut::<RuneSlot>()
@@ -336,7 +353,16 @@ mod tests {
 
         app.world_mut().write_message(EnterActiveRuneWord);
         app.update();
-        for _ in 0..5 {
+        for _ in 0..24 {
+            if app
+                .world()
+                .resource::<BattleState>()
+                .pending_resolved_row
+                .is_none()
+                && !app.world().resource::<PendingRowGrading>().is_active()
+            {
+                break;
+            }
             app.update();
         }
 
@@ -410,7 +436,10 @@ mod tests {
         app.world_mut().write_message(EnterActiveRuneWord);
         app.update();
 
-        for _ in 0..10 {
+        for _ in 0..30 {
+            if app.world().resource::<BattleState>().phase == BattlePhase::Idle {
+                break;
+            }
             app.update();
         }
 

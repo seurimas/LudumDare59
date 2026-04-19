@@ -10,6 +10,7 @@ use LudumDare59::{
 };
 use bevy::ecs::message::{MessageReader, MessageWriter};
 use bevy::prelude::*;
+use rand::thread_rng;
 
 const TEST_ID: u8 = 10;
 
@@ -195,7 +196,9 @@ fn on_acting_succeeded(
 
     if flow.binding_unlocked_by_quicktime {
         flow.binding_unlocked_by_quicktime = false;
-        start_binding.write(StartBinding(matched));
+        start_binding.write(StartBinding(
+            dictionary::random_futharkation_with_rune_length(5, &mut thread_rng()).unwrap(),
+        ));
         return;
     }
 
