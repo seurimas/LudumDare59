@@ -130,6 +130,16 @@ impl EliminatedFutharkKeys {
     pub fn insert(&mut self, letter: char) {
         self.letters.insert(letter);
     }
+
+    pub fn snapshot(&self) -> HashSet<char> {
+        self.letters.clone()
+    }
+
+    pub fn restore(&mut self, letters: &HashSet<char>) {
+        for &ch in letters {
+            self.letters.insert(ch);
+        }
+    }
 }
 
 impl Default for FutharkKeyboardAliases {

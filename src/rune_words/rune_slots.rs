@@ -26,7 +26,7 @@ impl Default for RuneSlotForegroundSet {
 }
 
 impl RuneSlotForegroundSet {
-    fn sprite_index_for_rune(self, rune_index: usize) -> usize {
+    pub fn sprite_index_for_rune(self, rune_index: usize) -> usize {
         let normalized_index = rune_index % RUNES_PER_SET;
 
         match self {

@@ -12,7 +12,9 @@ use crate::npcs::NpcSpec;
 use crate::rune_words::battle::{BattlePhase, BattleState, PendingRowGrading};
 use crate::rune_words::battle_states::LastGradedWord;
 use crate::rune_words::battle_states::acting::StartActing;
-use crate::rune_words::battle_states::binding::{BindingData, BindingSucceeded, StartBinding};
+use crate::rune_words::battle_states::binding::{
+    BindingData, BindingFailed, BindingSucceeded, StartBinding,
+};
 use crate::spellbook::{Book, LearnedSpells};
 use crate::tutorial::TutorialState;
 use crate::ui::effects::EffectsQueue;
@@ -53,6 +55,7 @@ pub fn configure_combat(app: &mut App) {
             trigger_binding_on_npc_death,
             track_enemies_defeated,
             trigger_victory_on_binding_success,
+            handle_binding_failed,
             resume_combat_after_effects,
             tick_npc_spawn_timer,
             check_player_death,
@@ -249,6 +252,9 @@ fn setup_binding_target_on_battle_start(
         return;
     }
 
+    // Fresh battle — clear any persisted eliminations from the previous fight.
+    binding_data.persisted_eliminations.clear();
+
     // During tutorial, use a fixed binding word
     if tutorial.as_ref().is_some_and(|t| t.active) {
         match dictionary::futharkation_from_word(crate::tutorial::TUTORIAL_BINDING_WORD) {
@@ -388,6 +394,35 @@ fn trigger_victory_on_binding_success(
     if battle_state.npc.is_some() {
         battle_state.phase = BattlePhase::Victory;
     }
+}
+
+/// When binding fails the NPC recovers half its max HP and returns to acting.
+/// Eliminated runes are remembered for the next binding attempt.
+fn handle_binding_failed(
+    mut events: MessageReader<BindingFailed>,
+    tutorial: Option<Res<TutorialState>>,
+    mut npcs: Query<&mut NpcCombatState>,
+    eliminated_keys: Option<Res<crate::futhark::EliminatedFutharkKeys>>,
+    mut binding_data: ResMut<BindingData>,
+    mut start_acting: MessageWriter<StartActing>,
+) {
+    if tutorial.as_ref().is_some_and(|t| t.active) {
+        events.clear();
+        return;
+    }
+    if events.read().last().is_none() {
+        return;
+    }
+    // Snapshot current eliminated keys so they can be restored on next binding.
+    if let Some(keys) = eliminated_keys {
+        binding_data.persisted_eliminations = keys.snapshot();
+    }
+    // Give the NPC half its max HP back.
+    for mut npc in &mut npcs {
+        npc.hp = npc.max / 2;
+    }
+    // Return to Acting phase.
+    start_acting.write(StartActing);
 }
 
 /// When there is no NPC and phase is Idle, count down a timer and then spawn a

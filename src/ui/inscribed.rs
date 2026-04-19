@@ -3,11 +3,15 @@ use bevy::prelude::*;
 use std::collections::HashMap;
 
 use crate::GameState;
+use crate::futhark::letter_to_index;
 use crate::rune_words::battle::{
     BattlePhase, BattleSet, BattleState, RowLetterGraded, RowResolved, RuneMatchState,
 };
+use crate::rune_words::rune_slots::RuneSlotForegroundSet;
 use crate::ui::hud_root::InscribedPanel;
 use crate::ui::palette::*;
+
+const LEDGER_TILE_SIZE: f32 = 36.0;
 
 /// Marker for the active attempt card.
 #[derive(Component)]
@@ -310,24 +314,51 @@ fn populate_ledger_on_row_resolved(
                         ..default()
                     })
                     .with_children(|tiles_row| {
-                        for (_letter, match_state) in &tiles {
+                        for (letter, match_state) in &tiles {
                             let tile_color = match_state.background_color();
-                            tiles_row.spawn((
-                                AttemptRowTile,
-                                Node {
-                                    width: Val::Px(18.0),
-                                    height: Val::Px(18.0),
-                                    border: UiRect::all(Val::Px(1.0)),
-                                    ..default()
-                                },
-                                BackgroundColor(tile_color),
-                                BorderColor {
-                                    top: Color::srgba(0.0, 0.0, 0.0, 0.5),
-                                    right: Color::srgba(0.0, 0.0, 0.0, 0.5),
-                                    bottom: Color::srgba(0.0, 0.0, 0.0, 0.5),
-                                    left: Color::srgba(0.0, 0.0, 0.0, 0.5),
-                                },
-                            ));
+                            let rune_sprite_index = letter_to_index(*letter).map(|rune_index| {
+                                RuneSlotForegroundSet::Alternate { page: 0 }
+                                    .sprite_index_for_rune(rune_index)
+                            });
+                            tiles_row
+                                .spawn((
+                                    AttemptRowTile,
+                                    Node {
+                                        width: Val::Px(LEDGER_TILE_SIZE),
+                                        height: Val::Px(LEDGER_TILE_SIZE),
+                                        border: UiRect::all(Val::Px(1.0)),
+                                        justify_content: JustifyContent::Center,
+                                        align_items: AlignItems::Center,
+                                        ..default()
+                                    },
+                                    BackgroundColor(tile_color),
+                                    BorderColor {
+                                        top: Color::srgba(0.0, 0.0, 0.0, 0.5),
+                                        right: Color::srgba(0.0, 0.0, 0.0, 0.5),
+                                        bottom: Color::srgba(0.0, 0.0, 0.0, 0.5),
+                                        left: Color::srgba(0.0, 0.0, 0.0, 0.5),
+                                    },
+                                ))
+                                .with_children(|tile| {
+                                    if let (Some(sprite_index), Some(assets)) =
+                                        (rune_sprite_index, game_assets.as_ref())
+                                    {
+                                        tile.spawn((
+                                            Node {
+                                                width: Val::Px(LEDGER_TILE_SIZE - 4.0),
+                                                height: Val::Px(LEDGER_TILE_SIZE - 4.0),
+                                                ..default()
+                                            },
+                                            ImageNode::from_atlas_image(
+                                                assets.futhark.clone(),
+                                                TextureAtlas {
+                                                    layout: assets.futhark_layout.clone(),
+                                                    index: sprite_index,
+                                                },
+                                            ),
+                                        ));
+                                    }
+                                });
                         }
                     });
 

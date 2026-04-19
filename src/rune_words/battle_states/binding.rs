@@ -28,6 +28,8 @@ pub struct BindingData {
     pub pending_success: bool,
     /// Number of remaining guess attempts. 0 means unlimited.
     pub attempts_remaining: u32,
+    /// Rune letters eliminated in a previous binding attempt, to be restored on re-entry.
+    pub persisted_eliminations: HashSet<char>,
     pending_eliminations_by_row: HashMap<u32, HashSet<char>>,
 }
 
@@ -113,6 +115,10 @@ fn start_binding(
     binding_data.pending_eliminations_by_row.clear();
     if let Some(mut eliminated_keys) = eliminated_keys {
         eliminated_keys.clear();
+        // Restore any eliminations persisted from a previous failed binding attempt.
+        if !binding_data.persisted_eliminations.is_empty() {
+            eliminated_keys.restore(&binding_data.persisted_eliminations);
+        }
     }
 
     let rune_count = target.letters.chars().count();
@@ -275,7 +281,6 @@ fn on_binding_row_resolved(
             for entity in existing_battle_slots.iter() {
                 commands.entity(entity).despawn();
             }
-            battle_state.phase = BattlePhase::Idle;
             active_slot.entity = None;
             failed.write(BindingFailed);
             return;
