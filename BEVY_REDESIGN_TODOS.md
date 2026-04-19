@@ -35,17 +35,17 @@ dependency order. Check items off as they are completed.
 
 ## 2. Overall Layout
 
-- [ ] Create `src/ui/mod.rs` with `pub fn configure_hud(app: &mut App)`
-      and call it from `lib.rs`
-- [ ] Spawn outer centering wrapper + `BattleHudRoot` 3×3 grid node on
+- [x] Create `src/ui/mod.rs` with `pub fn configure_ui(app: &mut App)`
+      (renamed from `configure_hud` to avoid churn) and call it from `lib.rs`
+- [x] Spawn outer centering wrapper + `BattleHudRoot` 3×3 grid node on
       `OnEnter(GameState::Ready)` (16:9 aspect-ratio locked, columns
       `[22fr, 50fr, 22fr]`, rows `[auto, 1fr, auto]`)
-- [ ] Spawn placeholder children for each grid cell so layout can be
+- [x] Spawn placeholder children for each grid cell so layout can be
       verified visually before individual panels are built:
       `CombatBar` (row 1, span 3), `LeftColumn` (row 2 col 1),
       `ArenaPanel` (row 2 col 2), `BookPanel` (row 2 col 3),
       `BindingPanel` (row 3, span 3)
-- [ ] Set `ClearColor` to `NIGHT` (`#0f0a07`) replacing current blue
+- [x] Set `ClearColor` to `NIGHT` (`#0f0a07`) replacing current blue
 - [ ] Spawn fullscreen vignette overlay (`ImageNode` with `color` alpha 0.4,
       `NodeImageMode::Stretch`, high `ZIndex`) once vignette asset exists
 

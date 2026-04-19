@@ -80,7 +80,7 @@ pub struct GameAssets {
 }
 
 pub fn configure_app(app: &mut App) {
-    app.insert_resource(ClearColor(Color::linear_rgb(0.0, 0.0, 1.0)));
+    app.insert_resource(ClearColor(ui::palette::NIGHT));
     futhark::configure_futhark_keyboard(app);
     rune_words::rune_slots::configure_rune_slots(app);
     combat::configure_combat(app);
