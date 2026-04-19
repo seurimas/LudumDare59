@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::rune_words::battle::{BattlePhase, BattleState, NpcType};
 use crate::ui::clock::{BattleUiClock, wave};
-use crate::ui::health::NpcHealthState;
+use crate::health::NpcHealthState;
 use crate::ui::hud_root::ArenaPanel;
 use crate::ui::palette::*;
 use crate::{GameAssets, GameState};

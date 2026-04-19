@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::GameAssets;
 use crate::GameState;
 use crate::rune_words::battle::BattleState;
-use crate::ui::health::{NpcHealthState, PlayerHealthState};
+use crate::health::{NpcHealthState, PlayerHealthState};
 use crate::ui::hud_root::CombatBar;
 use crate::ui::palette::*;
 

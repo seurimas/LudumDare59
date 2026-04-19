@@ -2,11 +2,14 @@ use bevy::prelude::*;
 use bevy_aspect_ratio_mask::{AspectRatioPlugin, Resolution};
 use bevy_asset_loader::prelude::*;
 
+use crate::health::PlayerHealthState;
+
 pub mod acceptance;
 pub mod audio;
 pub mod combat;
 pub mod dictionary;
 pub mod futhark;
+pub mod health;
 pub mod loading;
 pub mod rune_words;
 pub mod ui;
@@ -102,6 +105,8 @@ pub fn configure_app(app: &mut App) {
     futhark::configure_futhark_keyboard(app);
     rune_words::rune_slots::configure_rune_slots(app);
     ui::configure_ui(app);
+
+    app.init_resource::<PlayerHealthState>();
 
     app.add_systems(
         Update,

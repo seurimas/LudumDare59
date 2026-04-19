@@ -23,7 +23,3 @@ impl Default for NpcHealthState {
         Self { hp: 60, max: 100 }
     }
 }
-
-pub fn configure_health(app: &mut App) {
-    app.init_resource::<PlayerHealthState>();
-}
