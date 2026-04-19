@@ -13,6 +13,7 @@ pub mod health;
 pub mod loading;
 pub mod npcs;
 pub mod rune_words;
+pub mod spellbook;
 pub mod ui;
 
 #[derive(States, Default, Debug, Clone, PartialEq, Eq, Hash)]
@@ -96,6 +97,8 @@ pub struct GameAssets {
     pub goblin_spec: Handle<npcs::NpcSpec>,
     #[asset(path = "npcs/robed.npc.json")]
     pub robed_spec: Handle<npcs::NpcSpec>,
+    #[asset(path = "spellbook.book.json")]
+    pub spellbook: Handle<spellbook::Book>,
 }
 
 pub fn configure_app(app: &mut App) {
@@ -146,5 +149,6 @@ pub fn configure_app(app: &mut App) {
 pub fn configure_loading(app: &mut App) {
     audio::configure_audio(app);
     npcs::configure_npcs(app);
+    spellbook::configure_book_asset(app);
     loading::configure_loading(app);
 }

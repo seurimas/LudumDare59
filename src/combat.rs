@@ -1,14 +1,45 @@
-use bevy::ecs::message::MessageWriter;
+use bevy::ecs::message::{MessageReader, MessageWriter};
 use bevy::prelude::*;
 use rand::Rng;
 
+use crate::GameAssets;
 use crate::GameState;
-use crate::health::{NpcAttack, NpcAttackState, NpcCombatState};
+use crate::health::{NpcAttack, NpcAttackState, NpcCombatState, PlayerCombatState};
 use crate::rune_words::battle::{BattlePhase, BattleState};
+use crate::spellbook::Book;
+
+/// Raised to signal the start of a fresh combat. Consumers reset per-combat
+/// state (deck/hand/discard) when this fires.
+#[derive(bevy::ecs::message::Message, Clone, Copy, Debug, Default)]
+pub struct BattleStart;
 
 pub fn configure_combat(app: &mut App) {
     app.add_message::<NpcAttack>();
-    app.add_systems(Update, tick_npc_attacks.run_if(in_state(GameState::Ready)));
+    app.add_message::<BattleStart>();
+    app.add_systems(
+        Update,
+        (tick_npc_attacks, reset_player_deck_on_battle_start)
+            .run_if(in_state(GameState::Ready)),
+    );
+}
+
+fn reset_player_deck_on_battle_start(
+    mut events: MessageReader<BattleStart>,
+    mut player: ResMut<PlayerCombatState>,
+    game_assets: Option<Res<GameAssets>>,
+    books: Res<Assets<Book>>,
+) {
+    if events.read().count() == 0 {
+        return;
+    }
+    let Some(game_assets) = game_assets else {
+        return;
+    };
+    let Some(book) = books.get(&game_assets.spellbook) else {
+        return;
+    };
+    let mut rng = rand::thread_rng();
+    player.reset_for_new_combat(book.spells(), &mut rng);
 }
 
 fn tick_npc_attacks(

@@ -1,7 +1,9 @@
 use LudumDare59::{
-    GameAssets, GameState, acceptance, configure_app, configure_loading, dictionary,
+    GameAssets, GameState, acceptance,
+    combat::BattleStart,
+    configure_app, configure_loading, dictionary,
     futhark::{FutharkKeyboardAnimationSpeed, spawn_futhark_keyboard},
-    health::NpcCombatState,
+    health::{NpcCombatState, PlayerCombatState},
     npcs::NpcSpec,
     rune_words::{
         battle::{BattleState, NpcType, configure_battle},
@@ -38,6 +40,7 @@ fn main() {
             apply_spec_to_spawned_npc,
             loop_acting_on_success,
             update_status_label,
+            update_deck_label,
         )
             .chain()
             .run_if(in_state(GameState::Ready)),
@@ -66,6 +69,9 @@ struct InstructionsPanel;
 
 #[derive(Component)]
 struct StatusLabel;
+
+#[derive(Component)]
+struct DeckLabel;
 
 fn configure_keyboard_speed(mut speed: ResMut<FutharkKeyboardAnimationSpeed>) {
     speed.hue_degrees_per_second = 45.0;
@@ -118,6 +124,15 @@ fn spawn_instructions(mut commands: Commands) {
                 },
                 TextColor(Color::srgb(0.9, 0.85, 0.55)),
             ));
+            panel.spawn((
+                DeckLabel,
+                Text::new("Hand: -   Deck: -   Discard: -"),
+                TextFont {
+                    font_size: 16.0,
+                    ..default()
+                },
+                TextColor(Color::srgb(0.75, 0.85, 0.95)),
+            ));
         });
 }
 
@@ -128,6 +143,7 @@ fn pick_npc_on_function_keys(
     mut battle_state: ResMut<BattleState>,
     mut fight: ResMut<ActiveFight>,
     mut start_acting: MessageWriter<StartActing>,
+    mut battle_start: MessageWriter<BattleStart>,
 ) {
     let picked_spec = if input.just_pressed(KeyCode::F3) {
         specs.get(&game_assets.goblin_spec)
@@ -155,6 +171,7 @@ fn pick_npc_on_function_keys(
     fight.max_health = Some(spec.max_health);
     fight.attack_count = spec.attacks.len();
 
+    battle_start.write(BattleStart);
     start_acting.write(StartActing { targets: words });
 }
 
@@ -207,6 +224,25 @@ fn update_status_label(fight: Res<ActiveFight>, mut labels: Query<&mut Text, Wit
             )
         }
     };
+    for mut label in &mut labels {
+        if label.0 != text {
+            label.0 = text.clone();
+        }
+    }
+}
+
+fn update_deck_label(
+    player: Res<PlayerCombatState>,
+    mut labels: Query<&mut Text, With<DeckLabel>>,
+) {
+    let hand_words: Vec<&str> = player.hand.iter().map(|c| c.word.as_str()).collect();
+    let text = format!(
+        "Hand [{}]: {}   |   Deck: {}   Discard: {}",
+        hand_words.len(),
+        hand_words.join(", "),
+        player.deck.len(),
+        player.discard.len(),
+    );
     for mut label in &mut labels {
         if label.0 != text {
             label.0 = text.clone();

@@ -1,5 +1,28 @@
 {
   "max_health": 60,
+  "minimum_bindings": 3,
+  "binding_words": [
+    "abbate",
+    "agate",
+    "altered",
+    "weirder",
+    "vessel",
+    "shelter",
+    "crusher",
+    "noggle",
+    "socket",
+    "squirt",
+    "float",
+    "poles",
+    "hefter",
+    "knickers",
+    "fuddle",
+    "winter",
+    "troupes",
+    "dooming",
+    "discern",
+    "sipping"
+  ],
   "npc_type": "Goblin",
   "attacks": [
     {

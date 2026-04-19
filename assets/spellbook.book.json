@@ -1,0 +1,185 @@
+[
+    {
+        "word": "icebolt",
+        "effects": [
+            {
+                "type": "damage",
+                "amount": 20
+            },
+            {
+                "type": "stun",
+                "amount": 5.0
+            }
+        ]
+    },
+    {
+        "word": "shield",
+        "effects": [
+            {
+                "type": "shield",
+                "amount": 30,
+                "duration": 15.0
+            }
+        ]
+    },
+    {
+        "word": "fireball",
+        "effects": [
+            {
+                "type": "damage",
+                "amount": 20
+            }
+        ]
+    },
+    {
+        "word": "evoke",
+        "effects": [
+            {
+                "type": "buff",
+                "amount": 3,
+                "duration": 8.0
+            }
+        ]
+    },
+    {
+        "word": "evokation",
+        "effects": [
+            {
+                "type": "buff",
+                "amount": 5,
+                "duration": 12.0
+            }
+        ]
+    },
+    {
+        "word": "ascendancy",
+        "effects": [
+            {
+                "type": "buff",
+                "amount": 10,
+                "duration": 20.0
+            }
+        ]
+    },
+    {
+        "word": "missiles",
+        "effects": [
+            {
+                "type": "damage",
+                "amount": 4
+            },
+            {
+                "type": "damage",
+                "amount": 4
+            },
+            {
+                "type": "damage",
+                "amount": 4
+            }
+        ]
+    },
+    {
+        "word": "block",
+        "effects": [
+            {
+                "type": "shield",
+                "amount": 15,
+                "duration": 4.0
+            }
+        ]
+    },
+    {
+        "word": "icebarrage",
+        "effects": [
+            {
+                "type": "damage",
+                "amount": 3
+            },
+            {
+                "type": "damage",
+                "amount": 3
+            },
+            {
+                "type": "damage",
+                "amount": 3
+            },
+            {
+                "type": "stun",
+                "amount": 3.0
+            }
+        ]
+    },
+    {
+        "word": "meteorite",
+        "effects": [
+            {
+                "type": "damage",
+                "amount": 15
+            },
+            {
+                "type": "damage",
+                "amount": 3
+            },
+            {
+                "type": "damage",
+                "amount": 3
+            },
+            {
+                "type": "damage",
+                "amount": 3
+            }
+        ]
+    },
+    {
+        "word": "blizzards",
+        "effects": [
+            {
+                "type": "damage",
+                "amount": 12
+            },
+            {
+                "type": "damage",
+                "amount": 2
+            },
+            {
+                "type": "damage",
+                "amount": 2
+            },
+            {
+                "type": "stun",
+                "amount": 3.0
+            }
+        ]
+    },
+    {
+        "word": "bop",
+        "effects": [
+            {
+                "type": "stun",
+                "amount": 3.0
+            }
+        ]
+    },
+    {
+        "word": "pow",
+        "effects": [
+            {
+                "type": "stun",
+                "amount": 3.0
+            },
+            {
+                "type": "damage",
+                "amount": 4
+            }
+        ]
+    },
+    {
+        "word": "disintegrate",
+        "effects": [
+            {
+                "type": "damage",
+                "amount": 40
+            }
+        ]
+    }
+]

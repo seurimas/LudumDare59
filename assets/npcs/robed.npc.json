@@ -1,5 +1,26 @@
 {
   "max_health": 90,
+  "minimum_bindings": 5,
+  "binding_words": [
+    "abbate",
+    "agate",
+    "altered",
+    "weirder",
+    "vessel",
+    "winter",
+    "dooming",
+    "discern",
+    "murmured",
+    "doubter",
+    "maggot",
+    "foust",
+    "dervish",
+    "steals",
+    "wrongly",
+    "beings",
+    "shines",
+    "ambers"
+  ],
   "npc_type": "Robed",
   "attacks": [
     {

@@ -342,6 +342,7 @@ mod tests {
             font_unifraktur: Handle::default(),
             goblin_spec: Handle::default(),
             robed_spec: Handle::default(),
+            spellbook: Handle::default(),
         });
         app
     }

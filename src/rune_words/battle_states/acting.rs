@@ -1,6 +1,7 @@
 use bevy::ecs::message::{MessageReader, MessageWriter};
 use bevy::prelude::*;
 
+use crate::health::PlayerCombatState;
 use crate::rune_words::battle::{
     BattlePhase, BattleRuneSlot, BattleSet, BattleState, LEGACY_ACTIVE_ROW_TOP, PendingRowGrading,
     RowResolved, RuneMatchState, collect_guess_submission, queue_row_grading_playback,
@@ -45,6 +46,22 @@ pub fn configure_acting(app: &mut App) {
             .run_if(is_acting)
             .in_set(BattleSet::PostAnimation),
     );
+    app.add_systems(Update, refill_hand_on_acting_success);
+}
+
+fn refill_hand_on_acting_success(
+    mut events: MessageReader<ActingSucceeded>,
+    player: Option<ResMut<PlayerCombatState>>,
+) {
+    let Some(mut player) = player else {
+        return;
+    };
+    let mut rng = rand::thread_rng();
+    for event in events.read() {
+        if player.cast_from_hand(&event.matched.word) {
+            player.draw(1, &mut rng);
+        }
+    }
 }
 
 fn is_acting(state: Res<BattleState>) -> bool {
@@ -320,6 +337,7 @@ mod tests {
             font_unifraktur: Handle::default(),
             goblin_spec: Handle::default(),
             robed_spec: Handle::default(),
+            spellbook: Handle::default(),
         });
         app
     }
