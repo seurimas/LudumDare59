@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 
 use crate::health::{NpcAttackState, NpcCombatState};
-use crate::npcs::NpcSpec;
 use crate::rune_words::battle::{BattlePhase, BattleState, NpcType};
 use crate::ui::clock::{BattleUiClock, wave};
 use crate::ui::hud_root::ArenaPanel;
@@ -51,7 +50,12 @@ pub fn configure_arena(app: &mut App) {
     );
     app.add_systems(
         Update,
-        (sync_npc_sprite, sync_phase_mark, animate_arena, animate_npc_death_fade)
+        (
+            sync_npc_sprite,
+            sync_phase_mark,
+            animate_arena,
+            animate_npc_death_fade,
+        )
             .run_if(in_state(GameState::Ready)),
     );
 }
@@ -245,10 +249,12 @@ fn npc_image(npc_type: NpcType, game_assets: &GameAssets) -> ImageNode {
 fn sync_npc_sprite(
     mut commands: Commands,
     game_assets: Res<GameAssets>,
-    npc_specs: Res<Assets<NpcSpec>>,
     battle_state: Option<Res<BattleState>>,
     panel_query: Query<Entity, With<ArenaPanel>>,
-    mut npc_query: Query<(Entity, &mut ImageNode, &NpcCombatState), (With<NpcSprite>, Without<NpcDeathFade>)>,
+    mut npc_query: Query<
+        (Entity, &mut ImageNode, &NpcCombatState),
+        (With<NpcSprite>, Without<NpcDeathFade>),
+    >,
     shadow_query: Query<Entity, With<GroundShadow>>,
 ) {
     let Some(battle_state) = battle_state else {
@@ -271,7 +277,7 @@ fn sync_npc_sprite(
     }
 
     let should_show =
-        battle_state.npc_type.is_some() && !matches!(battle_state.phase, BattlePhase::Idle);
+        battle_state.npc.is_some() && !matches!(battle_state.phase, BattlePhase::Idle);
 
     if !should_show {
         for (entity, _, _) in &npc_query {
@@ -283,23 +289,20 @@ fn sync_npc_sprite(
         return;
     }
 
-    let npc_type = battle_state.npc_type.unwrap();
+    let Some(npc_spec) = battle_state.npc.as_ref() else {
+        return;
+    };
+    let npc_type = npc_spec.npc_type;
 
     if npc_query.is_empty() {
         let Ok(panel_entity) = panel_query.single() else {
             return;
         };
 
-        let spec_handle = match npc_type {
-            NpcType::Goblin => &game_assets.goblin_spec,
-            NpcType::Robed => &game_assets.robed_spec,
-        };
         let mut combat_state = NpcCombatState::default();
-        if let Some(spec) = npc_specs.get(spec_handle) {
-            combat_state.max = spec.max_health;
-            combat_state.hp = spec.max_health;
-            combat_state.attacks = spec.attacks.clone();
-        }
+        combat_state.max = npc_spec.max_health;
+        combat_state.hp = npc_spec.max_health;
+        combat_state.attacks = npc_spec.attacks.clone();
 
         let sprite_index = npc_sprite_index(&combat_state, battle_state.phase);
         let mut image_node = npc_image(npc_type, &game_assets);
@@ -438,7 +441,7 @@ fn animate_npc_death_fade(
                 commands.entity(shadow_entity).despawn();
             }
             if let Some(ref mut bs) = battle_state {
-                bs.npc_type = None;
+                bs.npc = None;
                 bs.phase = BattlePhase::Idle;
             }
         }

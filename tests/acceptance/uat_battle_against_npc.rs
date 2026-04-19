@@ -164,7 +164,7 @@ fn pick_npc_on_function_keys(
         return;
     };
 
-    battle_state.npc_type = Some(spec.npc_type);
+    battle_state.npc = Some(spec.clone());
 
     let mut rng = rand::thread_rng();
     let words: Vec<dictionary::Futharkation> = [3usize, 4, 5, 3, 4]
@@ -234,6 +234,7 @@ fn on_binding_succeeded(
 
 fn on_binding_failed(
     mut failed: MessageReader<BindingFailed>,
+    battle_state: Res<BattleState>,
     fight: Res<ActiveFight>,
     mut npcs: Query<&mut NpcCombatState, With<NpcSprite>>,
     mut start_acting: MessageWriter<StartActing>,
@@ -242,8 +243,14 @@ fn on_binding_failed(
         return;
     }
     let half_health = fight.max_health.unwrap_or(0) / 2;
+    let minimum_bindings = battle_state
+        .npc
+        .as_ref()
+        .map(|spec| spec.minimum_bindings)
+        .unwrap_or(0);
     for mut npc in &mut npcs {
         npc.hp = half_health.max(1);
+        npc.bindings = minimum_bindings;
     }
     start_acting.write(StartActing);
 }

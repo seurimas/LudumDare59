@@ -82,11 +82,7 @@ impl PlayerCombatState {
 
     /// Reset for a brand-new combat: put every spell back in the deck,
     /// clear hand and discard, shuffle, and draw a starting hand.
-    pub fn reset_for_new_combat<R: rand::Rng + ?Sized>(
-        &mut self,
-        book: &[SpellDef],
-        rng: &mut R,
-    ) {
+    pub fn reset_for_new_combat<R: rand::Rng + ?Sized>(&mut self, book: &[SpellDef], rng: &mut R) {
         self.deck = book.to_vec();
         self.hand.clear();
         self.discard.clear();

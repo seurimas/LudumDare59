@@ -7,8 +7,7 @@ use crate::GameAssets;
 use crate::GameState;
 use crate::dictionary;
 use crate::health::{NpcAttack, NpcAttackState, NpcCombatState, PlayerCombatState};
-use crate::npcs::NpcSpec;
-use crate::rune_words::battle::{BattlePhase, BattleState, NpcType};
+use crate::rune_words::battle::{BattlePhase, BattleState};
 use crate::rune_words::battle_states::binding::{BindingData, StartBinding};
 use crate::spellbook::Book;
 
@@ -124,30 +123,17 @@ fn tick_npc_attacks(
     }
 }
 
-/// When a battle starts and the NPC type is known, pick a random binding word
+/// When a battle starts and the NPC spec is known, pick a random binding word
 /// from the NPC's spec and store it in BindingData so it's ready when binding begins.
 fn setup_binding_target_on_battle_start(
     mut events: MessageReader<BattleStart>,
     battle_state: Res<BattleState>,
-    game_assets: Option<Res<GameAssets>>,
-    npc_specs: Res<Assets<NpcSpec>>,
     mut binding_data: ResMut<BindingData>,
 ) {
     if events.read().count() == 0 {
         return;
     }
-    let Some(game_assets) = game_assets else {
-        return;
-    };
-    let Some(npc_type) = battle_state.npc_type else {
-        return;
-    };
-
-    let spec_handle = match npc_type {
-        NpcType::Goblin => &game_assets.goblin_spec,
-        NpcType::Robed => &game_assets.robed_spec,
-    };
-    let Some(spec) = npc_specs.get(spec_handle) else {
+    let Some(spec) = battle_state.npc.as_ref() else {
         return;
     };
 

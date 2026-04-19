@@ -6,7 +6,7 @@ use super::rune_slots::{
     RuneSlot, RuneSlotBackground, RuneSlotConfig, RuneSlotForegroundSet, RuneSlotLinks,
     spawn_rune_slot_flex, spawn_rune_word,
 };
-use crate::{GameAssets, futhark};
+use crate::{GameAssets, futhark, npcs::NpcSpec};
 
 /// Legacy absolute-pixel constants — kept for backward-compat; will be removed once UATs pass.
 pub const LEGACY_ACTIVE_ROW_TOP: f32 = 236.0;
@@ -67,7 +67,7 @@ impl RuneMatchState {
 #[derive(Resource, Default)]
 pub struct BattleState {
     pub phase: BattlePhase,
-    pub npc_type: Option<NpcType>,
+    pub npc: Option<NpcSpec>,
     pub active_row_slots: Vec<Entity>,
     pub pending_resolved_row: Option<u32>,
     pub pending_settle_frames: u8,

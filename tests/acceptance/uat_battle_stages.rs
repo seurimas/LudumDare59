@@ -1,9 +1,10 @@
 use LudumDare59::{
-    GameState, acceptance, configure_app, configure_loading, dictionary,
+    GameAssets, GameState, acceptance, configure_app, configure_loading, dictionary,
     futhark::{FutharkKeyboardAnimationSpeed, spawn_futhark_keyboard},
     health::PlayerCombatState,
+    npcs::NpcSpec,
     rune_words::{
-        battle::{BattleState, NpcType, configure_battle},
+        battle::{BattleState, configure_battle},
         battle_states::{
             acting::{ActingSucceeded, StartActing},
             binding::{BindingSucceeded, StartBinding},
@@ -66,12 +67,17 @@ struct DemoState {
 
 fn setup_demo(
     mut commands: Commands,
+    game_assets: Res<GameAssets>,
+    specs: Res<Assets<NpcSpec>>,
     mut start_acting: MessageWriter<StartActing>,
     mut player: ResMut<PlayerCombatState>,
     mut speed: ResMut<FutharkKeyboardAnimationSpeed>,
     mut battle_state: ResMut<BattleState>,
 ) {
-    battle_state.npc_type = Some(NpcType::Goblin);
+    let Some(spec) = specs.get(&game_assets.goblin_spec) else {
+        return;
+    };
+    battle_state.npc = Some(spec.clone());
     let mut rng = rand::thread_rng();
 
     let words: Vec<dictionary::Futharkation> = [3usize, 4, 5, 3, 4]
