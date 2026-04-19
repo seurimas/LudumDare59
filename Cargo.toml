@@ -53,3 +53,7 @@ path = "tests/acceptance/uat_battle_stages.rs"
 [[bin]]
 name = "uat_battle_against_npc"
 path = "tests/acceptance/uat_battle_against_npc.rs"
+
+[[bin]]
+name = "uat_shows_spell_selection"
+path = "tests/acceptance/shows_spell_selection.rs"

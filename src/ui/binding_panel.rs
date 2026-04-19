@@ -294,9 +294,7 @@ fn sync_binding_panel(
             .unwrap_or_default();
 
         let font = game_assets.font_im_fell_sc.clone();
-        commands
-            .entity(word_list_container)
-            .with_children(|area| {
+        commands.entity(word_list_container).with_children(|area| {
             for word in &binding_words {
                 area.spawn((
                     BindingWordListText,

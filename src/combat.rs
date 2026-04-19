@@ -38,7 +38,10 @@ pub fn configure_combat(app: &mut App) {
         remaining: NPC_SPAWN_DELAY,
         active: false,
     });
-    app.add_systems(OnEnter(GameState::Adventure), reset_learned_spells_to_starters);
+    app.add_systems(
+        OnEnter(GameState::Adventure),
+        reset_learned_spells_to_starters,
+    );
     app.add_systems(
         Update,
         (
