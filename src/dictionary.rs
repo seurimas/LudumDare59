@@ -36,9 +36,17 @@ impl fmt::Display for MissingIpaMapping {
 impl Pronunciation {
     pub fn to_futharkation(&self) -> Result<Futharkation, MissingIpaMapping> {
         let mut letters = String::new();
+        let mut chars = self.ipa.chars().peekable();
 
-        for symbol in self.ipa.chars() {
+        while let Some(symbol) = chars.next() {
             if should_skip_ipa_symbol(symbol) {
+                continue;
+            }
+
+            if let Some(letter) = ipa_digraph_to_futhark(symbol, chars.peek().copied()) {
+                chars.next();
+                debug_assert!(futhark::letter_to_index(letter).is_some());
+                letters.push(letter);
                 continue;
             }
 
@@ -200,6 +208,13 @@ fn random_futharkation_with_rune_length_from_pronunciations<R: Rng + ?Sized>(
     })
 }
 
+fn ipa_digraph_to_futhark(symbol: char, next: Option<char>) -> Option<char> {
+    match (symbol, next?) {
+        ('d', 'ʒ') => Some('j'),
+        _ => None,
+    }
+}
+
 fn should_skip_ipa_symbol(symbol: char) -> bool {
     matches!(
         symbol,
@@ -284,6 +299,17 @@ mod tests {
 
         let mapped = pronunciation.to_futharkation().expect("mapped");
         assert_eq!(mapped.letters, "test");
+    }
+
+    #[test]
+    fn maps_dz_affricate_to_j() {
+        let pronunciation = Pronunciation {
+            word: "judge".to_string(),
+            ipa: "ˈdʒədʒ".to_string(),
+        };
+
+        let mapped = pronunciation.to_futharkation().expect("mapped");
+        assert_eq!(mapped.letters, "jej");
     }
 
     #[test]
