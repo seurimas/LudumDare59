@@ -2,7 +2,7 @@ use bevy::ecs::message::{MessageReader, MessageWriter};
 use bevy::prelude::*;
 
 use crate::rune_words::battle::{
-    LEGACY_ACTIVE_ROW_TOP, BattlePhase, BattleRuneSlot, BattleSet, BattleState, PendingRowGrading,
+    BattlePhase, BattleRuneSlot, BattleSet, BattleState, LEGACY_ACTIVE_ROW_TOP, PendingRowGrading,
     RowResolved, RuneMatchState, collect_guess_submission, queue_row_grading_playback,
     reset_battle_state, score_guess_submission, spawn_battle_row, spawn_battle_row_in_container,
 };
@@ -447,7 +447,7 @@ pub(crate) fn find_best_match(
 mod tests {
     use super::*;
     use crate::futhark;
-    use crate::rune_words::battle::{configure_battle};
+    use crate::rune_words::battle::configure_battle;
     use crate::rune_words::rune_slots::{RuneSlot, configure_rune_slots};
     use bevy::time::TimeUpdateStrategy;
     use std::time::Duration;

@@ -5,7 +5,7 @@ edition = "2024"
 default-run = "LudumDare59"
 
 [dependencies]
-bevy = "0.18.1"
+bevy = { version = "0.18.1", features = ["debug"] }
 bevy_asset_loader = { version = "0.26", features = ["2d"] }
 rand = "0.8"
 rodio = "0.20"

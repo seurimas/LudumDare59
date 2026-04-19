@@ -30,12 +30,12 @@ Do `git log -3` before beginning work. This will highlight the most recent work 
 
 ## Post-work checklist
 
-After completing ANY work, always run `cargo test`. Additionally, identify any new or changed UAT tests. Run them with `cargo run --bin <name>` and expect a zero output. YOU must run the UAT when it is appropriate to do so. If you get a non-zero output, use AskUserQuestion or similar tool to ask what went wrong and iterate on their feedback.
+After completing ANY non-visual work, always run `cargo test`. For visual work, you must identify any new or changed UAT tests. Run them with `cargo run --bin <name>` and expect a zero output. YOU must run the UAT when it is appropriate to do so. If you get a non-zero output, use AskUserQuestion or similar tool to ask what went wrong and iterate on their feedback.
 
 Verify that your changes have not introduced new problems. When that is complete, go ahead and do all of the following:
 
 ```
-cargo fmt ; cargo build LudumDare59
+cargo fmt ; cargo check LudumDare59
 git add .
 git commit -m "<A meaningful commit message>"
 ```

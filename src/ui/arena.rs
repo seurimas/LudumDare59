@@ -42,8 +42,7 @@ pub fn configure_arena(app: &mut App) {
     );
     app.add_systems(
         Update,
-        (sync_npc_sprite, sync_phase_mark, animate_arena)
-            .run_if(in_state(GameState::Ready)),
+        (sync_npc_sprite, sync_phase_mark, animate_arena).run_if(in_state(GameState::Ready)),
     );
 }
 
@@ -75,10 +74,30 @@ pub fn spawn_arena_ui(
         // ── Corner brackets: 2 bars (horizontal + vertical) per corner ───────
         let bracket_pct = 2.5_f32;
         for (t, r, b, l) in [
-            (Val::Percent(bracket_pct), Val::Auto, Val::Auto, Val::Percent(bracket_pct)), // TL
-            (Val::Percent(bracket_pct), Val::Percent(bracket_pct), Val::Auto, Val::Auto), // TR
-            (Val::Auto, Val::Auto, Val::Percent(bracket_pct), Val::Percent(bracket_pct)), // BL
-            (Val::Auto, Val::Percent(bracket_pct), Val::Percent(bracket_pct), Val::Auto), // BR
+            (
+                Val::Percent(bracket_pct),
+                Val::Auto,
+                Val::Auto,
+                Val::Percent(bracket_pct),
+            ), // TL
+            (
+                Val::Percent(bracket_pct),
+                Val::Percent(bracket_pct),
+                Val::Auto,
+                Val::Auto,
+            ), // TR
+            (
+                Val::Auto,
+                Val::Auto,
+                Val::Percent(bracket_pct),
+                Val::Percent(bracket_pct),
+            ), // BL
+            (
+                Val::Auto,
+                Val::Percent(bracket_pct),
+                Val::Percent(bracket_pct),
+                Val::Auto,
+            ), // BR
         ] {
             // Horizontal bar
             arena.spawn((

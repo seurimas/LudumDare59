@@ -3,6 +3,7 @@ use bevy::prelude::*;
 pub mod arena;
 pub mod clock;
 pub mod health;
+pub mod health_bars;
 pub mod hud_root;
 pub mod inscribed;
 pub mod keyboard;
@@ -15,5 +16,6 @@ pub fn configure_ui(app: &mut App) {
     hud_root::configure_hud_root(app);
     arena::configure_arena(app);
     inscribed::configure_inscribed(app);
+    health_bars::configure_health_bars(app);
     samplers::configure_samplers(app);
 }

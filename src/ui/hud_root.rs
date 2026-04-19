@@ -59,9 +59,9 @@ pub fn spawn_battle_hud_root(mut commands: Commands) {
                             RepeatedGridTrack::fr(1, 22.0),
                         ],
                         grid_template_rows: vec![
-                            RepeatedGridTrack::auto(1),
-                            RepeatedGridTrack::fr(1, 1.0),
-                            RepeatedGridTrack::auto(1),
+                            RepeatedGridTrack::fr(1, 12.0),
+                            RepeatedGridTrack::fr(1, 74.0),
+                            RepeatedGridTrack::fr(1, 14.0),
                         ],
                         column_gap: Val::Percent(1.0),
                         row_gap: Val::Percent(1.0),
@@ -93,7 +93,7 @@ pub fn spawn_battle_hud_root(mut commands: Commands) {
                             InscribedPanel,
                             Node {
                                 flex_grow: 1.0,
-                                flex_basis: Val::Px(0.0),
+                                flex_basis: Val::Percent(0.0),
                                 flex_direction: FlexDirection::Column,
                                 row_gap: Val::Percent(1.5),
                                 padding: UiRect::all(Val::Percent(1.5)),
@@ -109,7 +109,7 @@ pub fn spawn_battle_hud_root(mut commands: Commands) {
                             grid_column: GridPlacement::start(2),
                             grid_row: GridPlacement::start(2),
                             overflow: Overflow::clip(),
-                            border: UiRect::all(Val::Px(1.0)),
+                            border: UiRect::all(Val::Percent(0.1)),
                             ..default()
                         },
                     ));
@@ -139,7 +139,7 @@ fn placeholder_node(column: GridPlacement, row: GridPlacement) -> Node {
         grid_row: row,
         justify_content: JustifyContent::Center,
         align_items: AlignItems::Center,
-        border: UiRect::all(Val::Px(1.0)),
+        border: UiRect::all(Val::Percent(0.1)),
         padding: UiRect::all(Val::Percent(0.6)),
         ..default()
     }

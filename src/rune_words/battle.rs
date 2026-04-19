@@ -31,6 +31,17 @@ pub enum BattlePhase {
     Reacting,
 }
 
+impl BattlePhase {
+    pub fn phase_index(&self) -> usize {
+        match self {
+            Self::Idle => 0,
+            Self::Binding => 0,
+            Self::Acting => 1,
+            Self::Reacting => 2,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NpcType {
     Goblin,
