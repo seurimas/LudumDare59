@@ -14,15 +14,20 @@ use crate::ui::inscribed::RuneSlotRow;
 use crate::{GameAssets, dictionary};
 
 #[derive(bevy::ecs::message::Message, Clone, Debug)]
-pub struct StartBinding(pub dictionary::Futharkation);
+pub struct StartBinding(pub Option<dictionary::Futharkation>);
 
 #[derive(bevy::ecs::message::Message, Clone, Debug, Default)]
 pub struct BindingSucceeded;
+
+#[derive(bevy::ecs::message::Message, Clone, Debug, Default)]
+pub struct BindingFailed;
 
 #[derive(Resource, Default)]
 pub struct BindingData {
     pub target: Option<dictionary::Futharkation>,
     pub pending_success: bool,
+    /// Number of remaining guess attempts. 0 means unlimited.
+    pub attempts_remaining: u32,
     pending_eliminations_by_row: HashMap<u32, HashSet<char>>,
 }
 
@@ -30,6 +35,7 @@ pub fn configure_binding(app: &mut App) {
     app.init_resource::<BindingData>();
     app.add_message::<StartBinding>();
     app.add_message::<BindingSucceeded>();
+    app.add_message::<BindingFailed>();
     app.add_systems(
         Update,
         (start_binding, score_binding_row_on_enter.run_if(is_binding)).chain(),
@@ -89,13 +95,21 @@ fn start_binding(
     let Some(game_assets) = game_assets else {
         return;
     };
-    let Some(StartBinding(target)) = start_events.read().last().cloned() else {
+    let Some(StartBinding(maybe_target)) = start_events.read().last().cloned() else {
+        return;
+    };
+
+    // Use the event's target if provided; otherwise fall back to the pre-set target.
+    if let Some(t) = maybe_target {
+        binding_data.target = Some(t);
+    }
+
+    let Some(target) = binding_data.target.clone() else {
         return;
     };
 
     reset_battle_state(&mut commands, &mut battle_state, existing_rows.iter());
     battle_state.phase = BattlePhase::Binding;
-    binding_data.target = Some(target.clone());
     binding_data.pending_eliminations_by_row.clear();
     if let Some(mut eliminated_keys) = eliminated_keys {
         eliminated_keys.clear();
@@ -226,6 +240,7 @@ fn on_binding_row_resolved(
     mut row_resolved: MessageReader<RowResolved>,
     mut binding_data: ResMut<BindingData>,
     mut succeeded: MessageWriter<BindingSucceeded>,
+    mut failed: MessageWriter<BindingFailed>,
     existing_battle_slots: Query<Entity, With<BattleRuneSlot>>,
     row_slot_container: Query<Entity, With<RuneSlotRow>>,
     mut last_graded_word: ResMut<LastGradedWord>,
@@ -250,6 +265,21 @@ fn on_binding_row_resolved(
         active_slot.entity = None;
         succeeded.write(BindingSucceeded);
         return;
+    }
+
+    // Failure path: track attempts if a limit is set.
+    if binding_data.attempts_remaining > 0 {
+        binding_data.attempts_remaining -= 1;
+        if binding_data.attempts_remaining == 0 {
+            // All attempts exhausted.
+            for entity in existing_battle_slots.iter() {
+                commands.entity(entity).despawn();
+            }
+            battle_state.phase = BattlePhase::Idle;
+            active_slot.entity = None;
+            failed.write(BindingFailed);
+            return;
+        }
     }
 
     // Failure: despawn old slots, spawn fresh row.
@@ -366,10 +396,10 @@ mod tests {
     fn start_binding_spawns_one_slot_per_target_rune() {
         let mut app = make_test_app();
         app.world_mut()
-            .write_message(StartBinding(dictionary::Futharkation {
+            .write_message(StartBinding(Some(dictionary::Futharkation {
                 word: "fable".to_string(),
                 letters: "futar".to_string(),
-            }));
+            })));
         app.update();
         let battle_state = app.world().resource::<BattleState>();
         assert_eq!(battle_state.active_row_slots.len(), 5);
@@ -383,7 +413,7 @@ mod tests {
             word: "fable".to_string(),
             letters: "futar".to_string(),
         };
-        app.world_mut().write_message(StartBinding(target));
+        app.world_mut().write_message(StartBinding(Some(target)));
         app.update();
 
         let submitted_row_slots = app
@@ -457,10 +487,10 @@ mod tests {
     fn multiple_failed_submissions_increment_resolved_count() {
         let mut app = make_test_app();
         app.world_mut()
-            .write_message(StartBinding(dictionary::Futharkation {
+            .write_message(StartBinding(Some(dictionary::Futharkation {
                 word: "fable".to_string(),
                 letters: "futar".to_string(),
-            }));
+            })));
         app.update();
 
         // Submit first row (partial)
@@ -518,7 +548,7 @@ mod tests {
             word: "fable".to_string(),
             letters: "futar".to_string(),
         };
-        app.world_mut().write_message(StartBinding(target));
+        app.world_mut().write_message(StartBinding(Some(target)));
         app.update();
 
         fill_active_row(&mut app, "futar");
@@ -535,10 +565,10 @@ mod tests {
     fn binding_partial_match_does_not_set_pending_success() {
         let mut app = make_test_app();
         app.world_mut()
-            .write_message(StartBinding(dictionary::Futharkation {
+            .write_message(StartBinding(Some(dictionary::Futharkation {
                 word: "fable".to_string(),
                 letters: "futar".to_string(),
-            }));
+            })));
         app.update();
 
         fill_active_row(&mut app, "futxx");
@@ -555,10 +585,10 @@ mod tests {
     fn binding_success_transitions_to_idle_and_spawns_no_new_row() {
         let mut app = make_test_app();
         app.world_mut()
-            .write_message(StartBinding(dictionary::Futharkation {
+            .write_message(StartBinding(Some(dictionary::Futharkation {
                 word: "fable".to_string(),
                 letters: "futar".to_string(),
-            }));
+            })));
         app.update();
 
         fill_active_row(&mut app, "futar");

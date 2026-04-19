@@ -11,6 +11,10 @@ pub struct NpcSpec {
     pub max_health: u32,
     pub npc_type: NpcType,
     pub attacks: Vec<NpcAttackSpec>,
+    #[serde(default)]
+    pub binding_words: Vec<String>,
+    #[serde(default)]
+    pub minimum_bindings: u32,
 }
 
 #[derive(Default, TypePath)]

@@ -6,8 +6,11 @@ use LudumDare59::{
     health::{NpcCombatState, PlayerCombatState},
     npcs::NpcSpec,
     rune_words::{
-        battle::{BattleState, NpcType, configure_battle},
-        battle_states::acting::{ActingSucceeded, StartActing},
+        battle::{BattlePhase, BattleState, NpcType, configure_battle},
+        battle_states::{
+            acting::{ActingSucceeded, StartActing},
+            binding::{BindingFailed, BindingSucceeded},
+        },
     },
     spellbook::SpellDef,
     ui::{arena::NpcSprite, hud_root::spawn_battle_hud_root},
@@ -38,8 +41,11 @@ fn main() {
         Update,
         (
             pick_npc_on_function_keys,
+            set_npc_hp_zero_on_f5,
             apply_spec_to_spawned_npc,
             loop_acting_on_success,
+            on_binding_succeeded,
+            on_binding_failed,
             update_status_label,
             update_deck_label,
         )
@@ -50,7 +56,7 @@ fn main() {
     acceptance::initialize_app(
         &mut app,
         TEST_ID.into(),
-        "Battle against NPC: F3 = Goblin, F4 = Robed cultist. Stats come from NpcSpec JSON.",
+        "Battle against NPC: F3 = Goblin, F4 = Robed cultist. F5 = set NPC HP to 0 (trigger binding).",
     );
 
     app.run();
@@ -100,7 +106,7 @@ fn spawn_instructions(mut commands: Commands) {
                 TextColor(Color::WHITE),
             ));
             panel.spawn((
-                Text::new("F3 - Goblin   |   F4 - Robed cultist"),
+                Text::new("F3 - Goblin   |   F4 - Robed cultist   |   F5 - set HP to 0"),
                 TextFont {
                     font_size: 18.0,
                     ..default()
@@ -200,6 +206,44 @@ fn loop_acting_on_success(
 ) {
     if succeeded.read().last().is_none() {
         return;
+    }
+    start_acting.write(StartActing);
+}
+
+fn set_npc_hp_zero_on_f5(
+    input: Res<ButtonInput<KeyCode>>,
+    mut npcs: Query<&mut NpcCombatState, With<NpcSprite>>,
+) {
+    if !input.just_pressed(KeyCode::F5) {
+        return;
+    }
+    for mut npc in &mut npcs {
+        npc.hp = 0;
+    }
+}
+
+fn on_binding_succeeded(
+    mut succeeded: MessageReader<BindingSucceeded>,
+    mut battle_state: ResMut<BattleState>,
+) {
+    if succeeded.read().last().is_none() {
+        return;
+    }
+    battle_state.phase = BattlePhase::Victory;
+}
+
+fn on_binding_failed(
+    mut failed: MessageReader<BindingFailed>,
+    fight: Res<ActiveFight>,
+    mut npcs: Query<&mut NpcCombatState, With<NpcSprite>>,
+    mut start_acting: MessageWriter<StartActing>,
+) {
+    if failed.read().last().is_none() {
+        return;
+    }
+    let half_health = fight.max_health.unwrap_or(0) / 2;
+    for mut npc in &mut npcs {
+        npc.hp = half_health.max(1);
     }
     start_acting.write(StartActing);
 }

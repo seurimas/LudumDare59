@@ -1,11 +1,15 @@
 use bevy::ecs::message::{MessageReader, MessageWriter};
 use bevy::prelude::*;
 use rand::Rng;
+use rand::seq::SliceRandom;
 
 use crate::GameAssets;
 use crate::GameState;
+use crate::dictionary;
 use crate::health::{NpcAttack, NpcAttackState, NpcCombatState, PlayerCombatState};
-use crate::rune_words::battle::{BattlePhase, BattleState};
+use crate::npcs::NpcSpec;
+use crate::rune_words::battle::{BattlePhase, BattleState, NpcType};
+use crate::rune_words::battle_states::binding::{BindingData, StartBinding};
 use crate::spellbook::Book;
 
 /// Raised to signal the start of a fresh combat. Consumers reset per-combat
@@ -18,7 +22,12 @@ pub fn configure_combat(app: &mut App) {
     app.add_message::<BattleStart>();
     app.add_systems(
         Update,
-        (tick_npc_attacks, reset_player_deck_on_battle_start)
+        (
+            tick_npc_attacks,
+            reset_player_deck_on_battle_start,
+            setup_binding_target_on_battle_start,
+            trigger_binding_on_npc_death,
+        )
             .run_if(in_state(GameState::Ready)),
     );
 }
@@ -111,6 +120,66 @@ fn tick_npc_attacks(
             let attack = npc.attacks[idx];
             npc.chosen_attack = Some(attack);
             npc.attack_state = NpcAttackState::WaitingFor(attack.thinking_time);
+        }
+    }
+}
+
+/// When a battle starts and the NPC type is known, pick a random binding word
+/// from the NPC's spec and store it in BindingData so it's ready when binding begins.
+fn setup_binding_target_on_battle_start(
+    mut events: MessageReader<BattleStart>,
+    battle_state: Res<BattleState>,
+    game_assets: Option<Res<GameAssets>>,
+    npc_specs: Res<Assets<NpcSpec>>,
+    mut binding_data: ResMut<BindingData>,
+) {
+    if events.read().count() == 0 {
+        return;
+    }
+    let Some(game_assets) = game_assets else {
+        return;
+    };
+    let Some(npc_type) = battle_state.npc_type else {
+        return;
+    };
+
+    let spec_handle = match npc_type {
+        NpcType::Goblin => &game_assets.goblin_spec,
+        NpcType::Robed => &game_assets.robed_spec,
+    };
+    let Some(spec) = npc_specs.get(spec_handle) else {
+        return;
+    };
+
+    let mut rng = rand::thread_rng();
+    let Some(word) = spec.binding_words.choose(&mut rng) else {
+        return;
+    };
+
+    match dictionary::futharkation_from_word(word) {
+        Ok(futharkation) => {
+            binding_data.target = Some(futharkation);
+            binding_data.attempts_remaining = spec.minimum_bindings;
+        }
+        Err(e) => {
+            bevy::log::warn!("Could not futharkate binding word '{}': {}", word, e);
+        }
+    }
+}
+
+/// When an NPC's HP reaches 0 during the Acting phase, trigger the binding phase.
+fn trigger_binding_on_npc_death(
+    battle_state: Res<BattleState>,
+    npcs: Query<&NpcCombatState>,
+    mut start_binding: MessageWriter<StartBinding>,
+) {
+    if !matches!(battle_state.phase, BattlePhase::Acting) {
+        return;
+    }
+    for npc in &npcs {
+        if npc.hp == 0 {
+            start_binding.write(StartBinding(None));
+            return;
         }
     }
 }

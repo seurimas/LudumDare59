@@ -28,12 +28,13 @@ pub enum BattlePhase {
     Idle,
     Binding,
     Acting,
+    Victory,
 }
 
 impl BattlePhase {
     pub fn phase_index(&self) -> usize {
         match self {
-            Self::Idle => 0,
+            Self::Idle | Self::Victory => 0,
             Self::Binding => 0,
             Self::Acting => 1,
         }

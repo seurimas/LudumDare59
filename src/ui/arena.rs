@@ -34,6 +34,14 @@ struct PhaseMarkDot;
 #[derive(Component)]
 struct PhaseMarkText;
 
+/// Added to an NPC sprite entity when it dies; drives the fade-out animation.
+#[derive(Component, Default)]
+struct NpcDeathFade {
+    elapsed: f32,
+}
+
+const NPC_DEATH_FADE_DURATION: f32 = 0.8;
+
 // ─── Configure ────────────────────────────────────────────────────────────────
 
 pub fn configure_arena(app: &mut App) {
@@ -43,7 +51,8 @@ pub fn configure_arena(app: &mut App) {
     );
     app.add_systems(
         Update,
-        (sync_npc_sprite, sync_phase_mark, animate_arena).run_if(in_state(GameState::Ready)),
+        (sync_npc_sprite, sync_phase_mark, animate_arena, animate_npc_death_fade)
+            .run_if(in_state(GameState::Ready)),
     );
 }
 
@@ -239,7 +248,7 @@ fn sync_npc_sprite(
     npc_specs: Res<Assets<NpcSpec>>,
     battle_state: Option<Res<BattleState>>,
     panel_query: Query<Entity, With<ArenaPanel>>,
-    mut npc_query: Query<(Entity, &mut ImageNode, &NpcCombatState), With<NpcSprite>>,
+    mut npc_query: Query<(Entity, &mut ImageNode, &NpcCombatState), (With<NpcSprite>, Without<NpcDeathFade>)>,
     shadow_query: Query<Entity, With<GroundShadow>>,
 ) {
     let Some(battle_state) = battle_state else {
@@ -251,6 +260,15 @@ fn sync_npc_sprite(
         }
         return;
     };
+
+    // Victory phase: begin death fade on the NPC sprite (only once — sprite
+    // won't appear in npc_query again after NpcDeathFade is inserted).
+    if matches!(battle_state.phase, BattlePhase::Victory) {
+        for (entity, _, _) in &npc_query {
+            commands.entity(entity).insert(NpcDeathFade::default());
+        }
+        return;
+    }
 
     let should_show =
         battle_state.npc_type.is_some() && !matches!(battle_state.phase, BattlePhase::Idle);
@@ -343,6 +361,7 @@ fn phase_display_name(phase: BattlePhase) -> &'static str {
         BattlePhase::Idle => "Idle",
         BattlePhase::Acting => "Combat",
         BattlePhase::Binding => "Binding",
+        BattlePhase::Victory => "Victory",
     }
 }
 
@@ -364,6 +383,7 @@ fn sync_phase_mark(
         BattlePhase::Idle => Color::srgba(0.4, 0.3, 0.2, 0.6),
         BattlePhase::Acting => BLOOD_BRIGHT.with_alpha(0.9),
         BattlePhase::Binding => GOLD.with_alpha(0.9),
+        BattlePhase::Victory => Color::srgb(0.2, 0.8, 0.4).with_alpha(0.9),
     };
     for mut bg in &mut dot_query {
         bg.0 = dot_color;
@@ -395,5 +415,32 @@ fn animate_arena(
     for mut bg in &mut dot_query {
         let base = bg.0;
         bg.0 = base.with_alpha(pulse_alpha);
+    }
+}
+
+// ─── NPC death fade ───────────────────────────────────────────────────────────
+
+fn animate_npc_death_fade(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut npc_query: Query<(Entity, &mut ImageNode, &mut NpcDeathFade), With<NpcSprite>>,
+    shadow_query: Query<Entity, With<GroundShadow>>,
+    mut battle_state: Option<ResMut<BattleState>>,
+) {
+    for (entity, mut image_node, mut fade) in &mut npc_query {
+        fade.elapsed += time.delta_secs();
+        let alpha = (1.0 - fade.elapsed / NPC_DEATH_FADE_DURATION).max(0.0);
+        image_node.color = image_node.color.with_alpha(alpha);
+
+        if fade.elapsed >= NPC_DEATH_FADE_DURATION {
+            commands.entity(entity).despawn();
+            for shadow_entity in &shadow_query {
+                commands.entity(shadow_entity).despawn();
+            }
+            if let Some(ref mut bs) = battle_state {
+                bs.npc_type = None;
+                bs.phase = BattlePhase::Idle;
+            }
+        }
     }
 }

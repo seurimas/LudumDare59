@@ -42,7 +42,7 @@ fn start_demo(
         .expect("default dictionary should contain a five-rune futharkation");
 
     speed.hue_degrees_per_second = 45.0;
-    start_binding.write(StartBinding(selected.clone()));
+    start_binding.write(StartBinding(Some(selected.clone())));
 
     commands.spawn((
         Node {
@@ -78,6 +78,6 @@ fn reset_on_f3(keys: Res<ButtonInput<KeyCode>>, mut start_binding: MessageWriter
     if keys.just_pressed(KeyCode::F3) {
         let selected = dictionary::random_futharkation_with_rune_length(5, &mut rand::thread_rng())
             .expect("default dictionary should contain a five-rune futharkation");
-        start_binding.write(StartBinding(selected));
+        start_binding.write(StartBinding(Some(selected)));
     }
 }

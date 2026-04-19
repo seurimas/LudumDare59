@@ -157,8 +157,8 @@ mod tests {
         let icebolt = book
             .spells()
             .iter()
-            .find(|s| s.word == "icebolt")
-            .expect("icebolt");
+            .find(|s| s.word == "iceblast")
+            .expect("iceblast");
         assert_eq!(icebolt.effects[0], SpellEffect::Damage { amount: 20 },);
         assert_eq!(icebolt.effects[1], SpellEffect::Stun { amount: 5.0 });
         assert!(!icebolt.futharkation.is_empty());
