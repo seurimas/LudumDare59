@@ -30,6 +30,7 @@ pub fn configure_combat(app: &mut App) {
             trigger_binding_on_npc_death,
             track_enemies_defeated,
             check_player_death,
+            debug_kill_player,
         )
             .run_if(in_state(GameState::Adventure)),
     );
@@ -198,5 +199,11 @@ fn check_player_death(
 ) {
     if player.hp == 0 {
         next_state.set(GameState::GameOver);
+    }
+}
+
+fn debug_kill_player(input: Res<ButtonInput<KeyCode>>, mut player: ResMut<PlayerCombatState>) {
+    if input.pressed(KeyCode::ControlLeft) && input.pressed(KeyCode::ShiftLeft) && input.just_pressed(KeyCode::Digit0) {
+        player.hp = 0;
     }
 }
