@@ -3,15 +3,17 @@ use bevy::prelude::*;
 use std::collections::{HashMap, HashSet};
 
 use super::rune_slots::{
-    RuneSlot, RuneSlotBackground, RuneSlotConfig, RuneSlotForegroundSet, spawn_rune_word,
+    RuneSlot, RuneSlotBackground, RuneSlotConfig, RuneSlotForegroundSet, RuneSlotLinks,
+    spawn_rune_slot_flex, spawn_rune_word,
 };
 use crate::{GameAssets, futhark};
 
-pub const ACTIVE_ROW_TOP: f32 = 236.0;
+/// Legacy absolute-pixel constants — kept for backward-compat; will be removed once UATs pass.
+pub const LEGACY_ACTIVE_ROW_TOP: f32 = 236.0;
 pub const ROW_RISE: f32 = 72.0;
-pub const ROW_LEFT: f32 = 36.0;
-pub const SLOT_SPACING: f32 = 68.0;
-pub const SLOT_SIZE: f32 = 48.0;
+pub const LEGACY_ROW_LEFT: f32 = 36.0;
+pub const LEGACY_SLOT_SPACING: f32 = 68.0;
+pub const LEGACY_SLOT_SIZE: f32 = 48.0;
 pub const ROW_RISE_DURATION_SECONDS: f32 = 0.5;
 
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
@@ -224,28 +226,13 @@ fn tint_slot(
 }
 
 fn begin_row_resolution_animation(
-    commands: &mut Commands,
+    _commands: &mut Commands,
     battle_state: &mut BattleState,
     row_id: u32,
-    row_slots: &[Entity],
-    slot_nodes: &Query<(Entity, &Node), With<BattleRuneSlot>>,
+    _row_slots: &[Entity],
 ) {
-    let active_set: HashSet<Entity> = row_slots.iter().copied().collect();
-
-    for entity in row_slots.iter().copied() {
-        let start_top = match slot_nodes.get(entity).map(|(_, n)| n.top) {
-            Ok(Val::Px(t)) => t,
-            _ => ACTIVE_ROW_TOP,
-        };
-        commands.entity(entity).insert(BattleRowMotion {
-            start_top,
-            end_top: start_top - ROW_RISE,
-            elapsed_seconds: 0.0,
-        });
-    }
-
-    push_all_non_active_slots_up(commands, &active_set, slot_nodes);
-
+    // No row-rise animation in the flex layout: just mark the row for resolution.
+    // `check_row_animation_done` will fire `RowResolved` immediately (no BattleRowMotion set).
     battle_state.pending_resolved_row = Some(row_id);
     battle_state.pending_settle_frames = 1;
 }
@@ -256,7 +243,6 @@ fn tick_pending_row_grading(
     mut battle_state: ResMut<BattleState>,
     mut pending: ResMut<PendingRowGrading>,
     mut row_letter_graded: MessageWriter<RowLetterGraded>,
-    slot_nodes: Query<(Entity, &Node), With<BattleRuneSlot>>,
     slot_children: Query<&Children>,
     mut backgrounds: Query<&mut RuneSlotBackground>,
 ) {
@@ -354,7 +340,6 @@ fn tick_pending_row_grading(
         &mut battle_state,
         queued.row_id,
         &queued.row_slots,
-        &slot_nodes,
     );
 }
 
@@ -431,12 +416,12 @@ pub fn spawn_battle_row(
     rune_count: usize,
     top: f32,
 ) -> Vec<Entity> {
-    let start_left = ROW_LEFT;
+    let start_left = LEGACY_ROW_LEFT;
     let configs = (0..rune_count)
         .map(|index| RuneSlotConfig {
-            left: Val::Px(start_left + index as f32 * SLOT_SPACING),
+            left: Val::Px(start_left + index as f32 * LEGACY_SLOT_SPACING),
             top: Val::Px(top),
-            size: SLOT_SIZE,
+            size: LEGACY_SLOT_SIZE,
             background_color: idle_row_color(),
             foreground_set: RuneSlotForegroundSet::Primary,
             initial_rune: None,
@@ -448,6 +433,52 @@ pub fn spawn_battle_row(
         commands.entity(*entity).insert(BattleRuneSlot { row_id });
     }
     slots
+}
+
+/// Spawn a battle row as flex children inside `container` (e.g. the `RuneSlotRow` UI node).
+/// Uses `LEGACY_SLOT_SIZE` pixel dimensions but without absolute top/left positioning.
+pub fn spawn_battle_row_in_container(
+    commands: &mut Commands,
+    game_assets: &GameAssets,
+    row_id: u32,
+    rune_count: usize,
+    container: Entity,
+) -> Vec<Entity> {
+    let entities: Vec<Entity> = (0..rune_count)
+        .map(|_| {
+            spawn_rune_slot_flex(
+                commands,
+                game_assets,
+                RuneSlotConfig {
+                    size: LEGACY_SLOT_SIZE,
+                    background_color: idle_row_color(),
+                    foreground_set: RuneSlotForegroundSet::Primary,
+                    initial_rune: None,
+                    ..default()
+                },
+            )
+        })
+        .collect();
+
+    let len = entities.len();
+    for i in 0..len {
+        let prev = if i > 0 { Some(entities[i - 1]) } else { None };
+        let next = if i + 1 < len {
+            Some(entities[i + 1])
+        } else {
+            None
+        };
+        commands
+            .entity(entities[i])
+            .insert(RuneSlotLinks { prev, next })
+            .insert(BattleRuneSlot { row_id });
+    }
+
+    for &entity in &entities {
+        commands.entity(container).add_child(entity);
+    }
+
+    entities
 }
 
 pub fn collect_guess_submission(
@@ -481,7 +512,7 @@ pub fn push_all_non_active_slots_up(
         }
         let start_top = match node.top {
             Val::Px(top) => top,
-            _ => ACTIVE_ROW_TOP,
+            _ => LEGACY_ACTIVE_ROW_TOP,
         };
         commands.entity(entity).insert(BattleRowMotion {
             start_top,

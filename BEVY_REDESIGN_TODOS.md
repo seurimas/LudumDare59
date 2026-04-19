@@ -80,24 +80,24 @@ dependency order. Check items off as they are completed.
 > Most existing game logic (RuneSlot, RowLetterGraded, RuneMatchState)
 > is kept; only the layout entities change.
 
-- [ ] Create `src/ui/inscribed.rs` with `pub fn configure_inscribed(app)`
-- [ ] Spawn `InscribedPanel` as a flex-col child of `LeftColumn`
+- [x] Create `src/ui/inscribed.rs` with `pub fn configure_inscribed(app)`
+- [x] Spawn `InscribedPanel` as a flex-col child of `LeftColumn`
       (flex: 1, takes remaining height above keyboard)
-- [ ] Spawn `ActiveAttemptCard` inside `InscribedPanel`:
+- [x] Spawn `ActiveAttemptCard` inside `InscribedPanel`:
       - `INSCRIBING` floating label (absolute, top edge, BLOOD_BRIGHT)
       - Rune display row wired to existing `RuneSlot` entities
-      - Blinking caret (`BlinkingCaret` Text entity, driven by `BattleUiClock`)
-- [ ] Spawn divider row between active card and ledger
-- [ ] Spawn `LedgerList` (flex-col, flex: 1, up to 4 `AttemptRow` entries):
+      - Removed blinking caret from the active row presentation
+- [x] Spawn divider row between active card and ledger
+- [x] Spawn `LedgerList` (flex-col, flex: 1, up to 4 `AttemptRow` entries):
       - Per-row: index numeral + tiles row (color from `RuneMatchState`) +
         word subtitle (known/unknown states)
       - Oldest row fade: walk children, set `TextColor` alpha and
         `ImageNode.color` alpha to 0.55 (no inherited opacity in Bevy)
-- [ ] Wire `RowLetterGraded` events → populate `AttemptRow` tile colors
-- [ ] Remove old absolute `Val::Px` layout constants (`ACTIVE_ROW_TOP`,
+- [x] Wire `RowLetterGraded` events → populate `AttemptRow` tile colors
+- [x] Remove old absolute `Val::Px` layout constants (`ACTIVE_ROW_TOP`,
       `ROW_LEFT`, `SLOT_SPACING`, `SLOT_SIZE`) — rename to `_LEGACY_` first,
       remove once UATs pass
-- [ ] Run `uat_shows_rune_slots`, `uat_shows_loading_rune_reveal`,
+- [x] Run `uat_shows_rune_slots`, `uat_shows_loading_rune_reveal`,
       `uat_shows_typed_futhark_rune`, and `uat_battle_stages` — confirm zero
 
 ---

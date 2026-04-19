@@ -321,6 +321,80 @@ pub fn spawn_rune_slot(
         .id()
 }
 
+/// Like `spawn_rune_slot` but uses flex layout (no absolute top/left positioning).
+/// Use this when the slot will be a flex child of a `RuneSlotRow` container.
+pub fn spawn_rune_slot_flex(
+    commands: &mut Commands,
+    game_assets: &GameAssets,
+    config: RuneSlotConfig,
+) -> Entity {
+    let rune_index = config.initial_rune.and_then(futhark::letter_to_index);
+    let foreground_index = rune_index
+        .map(|index| config.foreground_set.sprite_index_for_rune(index))
+        .unwrap_or(SPRITE_PRIMARY_RUNE_OFFSET);
+    let foreground_visibility = if rune_index.is_some() {
+        Visibility::Visible
+    } else {
+        Visibility::Hidden
+    };
+
+    commands
+        .spawn((
+            Button,
+            Node {
+                width: Val::Px(config.size),
+                height: Val::Px(config.size),
+                flex_shrink: 0.0,
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                ..default()
+            },
+            BackgroundColor(Color::NONE),
+            RuneSlot {
+                rune_index,
+                foreground_set: config.foreground_set,
+            },
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    width: Val::Px(config.size),
+                    height: Val::Px(config.size),
+                    ..default()
+                },
+                ImageNode::from_atlas_image(
+                    game_assets.futhark.clone(),
+                    TextureAtlas {
+                        layout: game_assets.futhark_layout.clone(),
+                        index: SPRITE_SLOT_BACKGROUND,
+                    },
+                ),
+                RuneSlotBackground {
+                    base_color: config.background_color,
+                },
+            ));
+
+            parent.spawn((
+                Node {
+                    width: Val::Px(config.size - 12.0),
+                    height: Val::Px(config.size - 12.0),
+                    ..default()
+                },
+                ImageNode::from_atlas_image(
+                    game_assets.futhark.clone(),
+                    TextureAtlas {
+                        layout: game_assets.futhark_layout.clone(),
+                        index: foreground_index,
+                    },
+                ),
+                foreground_visibility,
+                RuneSlotForeground,
+            ));
+        })
+        .id()
+}
+
 pub fn spawn_rune_word(
     commands: &mut Commands,
     game_assets: &GameAssets,

@@ -94,15 +94,12 @@ pub fn spawn_battle_hud_root(mut commands: Commands) {
                             Node {
                                 flex_grow: 1.0,
                                 flex_basis: Val::Px(0.0),
-                                justify_content: JustifyContent::Center,
-                                align_items: AlignItems::Center,
-                                border: UiRect::all(Val::Px(1.0)),
-                                padding: UiRect::all(Val::Percent(0.6)),
+                                flex_direction: FlexDirection::Column,
+                                row_gap: Val::Percent(1.5),
+                                padding: UiRect::all(Val::Percent(1.5)),
+                                overflow: Overflow::clip(),
                                 ..default()
                             },
-                            placeholder_background(),
-                            placeholder_border_color(),
-                            children![placeholder_label("Inscribed Attempts")],
                         ));
                     });
 

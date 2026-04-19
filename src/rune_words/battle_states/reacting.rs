@@ -2,11 +2,14 @@ use bevy::ecs::message::{MessageReader, MessageWriter};
 use bevy::prelude::*;
 
 use crate::rune_words::battle::{
-    ACTIVE_ROW_TOP, BattlePhase, BattleRuneSlot, BattleSet, BattleState, PendingRowGrading,
-    ROW_LEFT, RowResolved, RuneMatchState, collect_guess_submission, queue_row_grading_playback,
-    reset_battle_state, score_guess_submission, spawn_battle_row,
+    BattlePhase, BattleRuneSlot, BattleSet, BattleState, LEGACY_ACTIVE_ROW_TOP, LEGACY_ROW_LEFT,
+    PendingRowGrading, RowResolved, RuneMatchState, collect_guess_submission,
+    queue_row_grading_playback, reset_battle_state, score_guess_submission, spawn_battle_row,
+    spawn_battle_row_in_container,
 };
+use crate::rune_words::battle_states::LastGradedWord;
 use crate::rune_words::rune_slots::{ActiveRuneSlot, EnterActiveRuneWord, RuneSlot};
+use crate::ui::inscribed::RuneSlotRow;
 use crate::{GameAssets, dictionary};
 
 #[derive(bevy::ecs::message::Message, Clone, Debug)]
@@ -73,6 +76,7 @@ fn start_reacting(
     mut battle_state: ResMut<BattleState>,
     mut reacting_data: ResMut<ReactingData>,
     mut active_slot: ResMut<ActiveRuneSlot>,
+    row_slot_container: Query<Entity, With<RuneSlotRow>>,
 ) {
     let Some(game_assets) = game_assets else {
         return;
@@ -100,13 +104,23 @@ fn start_reacting(
     reacting_data.active = true;
     reacting_data.pending_success = false;
 
-    let row = spawn_battle_row(
-        &mut commands,
-        &game_assets,
-        battle_state.next_row_id,
-        rune_count,
-        ACTIVE_ROW_TOP,
-    );
+    let row = if let Some(container) = row_slot_container.iter().next() {
+        spawn_battle_row_in_container(
+            &mut commands,
+            &game_assets,
+            battle_state.next_row_id,
+            rune_count,
+            container,
+        )
+    } else {
+        spawn_battle_row(
+            &mut commands,
+            &game_assets,
+            battle_state.next_row_id,
+            rune_count,
+            LEGACY_ACTIVE_ROW_TOP,
+        )
+    };
     battle_state.next_row_id += 1;
     battle_state.active_row_slots = row.clone();
     active_slot.entity = row.first().copied();
@@ -122,8 +136,8 @@ fn start_reacting(
             TextColor(Color::WHITE),
             Node {
                 position_type: PositionType::Absolute,
-                left: Val::Px(ROW_LEFT),
-                top: Val::Px(ACTIVE_ROW_TOP + 64.0),
+                left: Val::Px(LEGACY_ROW_LEFT),
+                top: Val::Px(LEGACY_ACTIVE_ROW_TOP + 64.0),
                 ..default()
             },
         ))
@@ -258,14 +272,19 @@ fn on_reacting_row_resolved(
     mut row_resolved: MessageReader<RowResolved>,
     mut reacting_data: ResMut<ReactingData>,
     mut succeeded: MessageWriter<ReactingSucceeded>,
+    existing_battle_slots: Query<Entity, With<BattleRuneSlot>>,
+    row_slot_container: Query<Entity, With<RuneSlotRow>>,
+    mut last_graded_word: ResMut<LastGradedWord>,
 ) {
     let Some(game_assets) = game_assets else {
         return;
     };
-    if row_resolved.is_empty() {
+    if row_resolved.read().count() == 0 {
         return;
     }
-    row_resolved.clear();
+
+    // Record word for the ledger.
+    last_graded_word.word = reacting_data.target.as_ref().map(|t| t.word.clone());
 
     if reacting_data.pending_success {
         reacting_data.pending_success = false;
@@ -285,13 +304,29 @@ fn on_reacting_row_resolved(
         return;
     };
 
-    let row = spawn_battle_row(
-        &mut commands,
-        &game_assets,
-        battle_state.next_row_id,
-        target.letters.chars().count(),
-        ACTIVE_ROW_TOP,
-    );
+    // Despawn old slots, spawn fresh row.
+    for entity in existing_battle_slots.iter() {
+        commands.entity(entity).despawn();
+    }
+
+    let rune_count = target.letters.chars().count();
+    let row = if let Some(container) = row_slot_container.iter().next() {
+        spawn_battle_row_in_container(
+            &mut commands,
+            &game_assets,
+            battle_state.next_row_id,
+            rune_count,
+            container,
+        )
+    } else {
+        spawn_battle_row(
+            &mut commands,
+            &game_assets,
+            battle_state.next_row_id,
+            rune_count,
+            LEGACY_ACTIVE_ROW_TOP,
+        )
+    };
     battle_state.next_row_id += 1;
     battle_state.active_row_slots = row.clone();
     active_slot.entity = row.first().copied();
@@ -301,7 +336,7 @@ fn on_reacting_row_resolved(
 mod tests {
     use super::*;
     use crate::futhark;
-    use crate::rune_words::battle::{ACTIVE_ROW_TOP, ROW_RISE, configure_battle};
+    use crate::rune_words::battle::configure_battle;
     use crate::rune_words::rune_slots::{EnterActiveRuneWord, RuneSlot, configure_rune_slots};
     use bevy::time::TimeUpdateStrategy;
     use std::time::Duration;
@@ -484,7 +519,7 @@ mod tests {
     }
 
     #[test]
-    fn reacting_wrong_guess_pushes_previous_row_up() {
+    fn reacting_wrong_guess_increments_resolved_count() {
         let mut app = make_test_app();
         app.world_mut().write_message(StartReacting {
             target: futha("fable", "fut"),
@@ -505,7 +540,11 @@ mod tests {
             app.update();
         }
 
-        let top = app.world().entity(first_row[0]).get::<Node>().unwrap().top;
-        assert_eq!(top, Val::Px(ACTIVE_ROW_TOP - ROW_RISE));
+        let state = app.world().resource::<BattleState>();
+        assert_eq!(state.resolved_rows, 1, "resolved row count should be 1");
+        assert_ne!(
+            state.active_row_slots, first_row,
+            "new row entities should differ from first row"
+        );
     }
 }

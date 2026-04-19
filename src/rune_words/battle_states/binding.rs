@@ -3,11 +3,14 @@ use bevy::prelude::*;
 use std::collections::{HashMap, HashSet};
 
 use crate::rune_words::battle::{
-    ACTIVE_ROW_TOP, BattlePhase, BattleRuneSlot, BattleSet, BattleState, PendingRowGrading,
+    BattlePhase, BattleRuneSlot, BattleSet, BattleState, LEGACY_ACTIVE_ROW_TOP, PendingRowGrading,
     RowLetterGraded, RowResolved, RuneMatchState, collect_guess_submission,
     queue_row_grading_playback, reset_battle_state, score_guess_submission, spawn_battle_row,
+    spawn_battle_row_in_container,
 };
+use crate::rune_words::battle_states::LastGradedWord;
 use crate::rune_words::rune_slots::{ActiveRuneSlot, EnterActiveRuneWord, RuneSlot};
+use crate::ui::inscribed::RuneSlotRow;
 use crate::{GameAssets, dictionary};
 
 #[derive(bevy::ecs::message::Message, Clone, Debug)]
@@ -81,6 +84,7 @@ fn start_binding(
     mut binding_data: ResMut<BindingData>,
     mut active_slot: ResMut<ActiveRuneSlot>,
     eliminated_keys: Option<ResMut<crate::futhark::EliminatedFutharkKeys>>,
+    row_slot_container: Query<Entity, With<RuneSlotRow>>,
 ) {
     let Some(game_assets) = game_assets else {
         return;
@@ -97,13 +101,24 @@ fn start_binding(
         eliminated_keys.clear();
     }
 
-    let row = spawn_battle_row(
-        &mut commands,
-        &game_assets,
-        battle_state.next_row_id,
-        target.letters.chars().count(),
-        ACTIVE_ROW_TOP,
-    );
+    let rune_count = target.letters.chars().count();
+    let row = if let Some(container) = row_slot_container.iter().next() {
+        spawn_battle_row_in_container(
+            &mut commands,
+            &game_assets,
+            battle_state.next_row_id,
+            rune_count,
+            container,
+        )
+    } else {
+        spawn_battle_row(
+            &mut commands,
+            &game_assets,
+            battle_state.next_row_id,
+            rune_count,
+            LEGACY_ACTIVE_ROW_TOP,
+        )
+    };
     battle_state.next_row_id += 1;
     battle_state.active_row_slots = row.clone();
     active_slot.entity = row.first().copied();
@@ -211,18 +226,23 @@ fn on_binding_row_resolved(
     mut row_resolved: MessageReader<RowResolved>,
     mut binding_data: ResMut<BindingData>,
     mut succeeded: MessageWriter<BindingSucceeded>,
+    existing_battle_slots: Query<Entity, With<BattleRuneSlot>>,
+    row_slot_container: Query<Entity, With<RuneSlotRow>>,
+    mut last_graded_word: ResMut<LastGradedWord>,
 ) {
     let Some(game_assets) = game_assets else {
         return;
     };
-    if row_resolved.is_empty() {
+    if row_resolved.read().count() == 0 {
         return;
     }
-    row_resolved.clear();
 
     let Some(target) = binding_data.target.clone() else {
         return;
     };
+
+    // Record word for the ledger.
+    last_graded_word.word = Some(target.word.clone());
 
     if binding_data.pending_success {
         binding_data.pending_success = false;
@@ -232,13 +252,29 @@ fn on_binding_row_resolved(
         return;
     }
 
-    let row = spawn_battle_row(
-        &mut commands,
-        &game_assets,
-        battle_state.next_row_id,
-        target.letters.chars().count(),
-        ACTIVE_ROW_TOP,
-    );
+    // Failure: despawn old slots, spawn fresh row.
+    for entity in existing_battle_slots.iter() {
+        commands.entity(entity).despawn();
+    }
+
+    let rune_count = target.letters.chars().count();
+    let row = if let Some(container) = row_slot_container.iter().next() {
+        spawn_battle_row_in_container(
+            &mut commands,
+            &game_assets,
+            battle_state.next_row_id,
+            rune_count,
+            container,
+        )
+    } else {
+        spawn_battle_row(
+            &mut commands,
+            &game_assets,
+            battle_state.next_row_id,
+            rune_count,
+            LEGACY_ACTIVE_ROW_TOP,
+        )
+    };
     battle_state.next_row_id += 1;
     battle_state.active_row_slots = row.clone();
     active_slot.entity = row.first().copied();
@@ -248,9 +284,7 @@ fn on_binding_row_resolved(
 mod tests {
     use super::*;
     use crate::futhark;
-    use crate::rune_words::battle::{
-        ACTIVE_ROW_TOP, PendingRowGrading, ROW_RISE, RuneMatchState, configure_battle,
-    };
+    use crate::rune_words::battle::{PendingRowGrading, RuneMatchState, configure_battle};
     use crate::rune_words::rune_slots::{RuneSlotBackground, configure_rune_slots};
     use bevy::time::TimeUpdateStrategy;
     use std::time::Duration;
@@ -412,7 +446,7 @@ mod tests {
     }
 
     #[test]
-    fn incomplete_submission_pushes_previous_rows_up() {
+    fn multiple_failed_submissions_increment_resolved_count() {
         let mut app = make_test_app();
         app.world_mut()
             .write_message(StartBinding(dictionary::Futharkation {
@@ -421,21 +455,17 @@ mod tests {
             }));
         app.update();
 
-        let first_row_slots = app
-            .world()
-            .resource::<BattleState>()
-            .active_row_slots
-            .clone();
+        // Submit first row (partial)
+        let first_slot = app.world().resource::<BattleState>().active_row_slots[0];
         app.world_mut()
-            .entity_mut(first_row_slots[0])
+            .entity_mut(first_slot)
             .get_mut::<RuneSlot>()
             .unwrap()
             .rune_index = futhark::letter_to_index('f');
 
         app.world_mut().write_message(EnterActiveRuneWord);
-        app.update();
-
-        for _ in 0..24 {
+        for _ in 0..30 {
+            app.update();
             if !app
                 .world()
                 .resource::<BattleState>()
@@ -444,24 +474,19 @@ mod tests {
             {
                 break;
             }
-            app.update();
         }
 
-        let second_row_slots = app
-            .world()
-            .resource::<BattleState>()
-            .active_row_slots
-            .clone();
-        assert!(!second_row_slots.is_empty(), "second row should be spawned");
+        // Submit second row (partial)
+        let second_slot = app.world().resource::<BattleState>().active_row_slots[0];
         app.world_mut()
-            .entity_mut(second_row_slots[0])
+            .entity_mut(second_slot)
             .get_mut::<RuneSlot>()
             .unwrap()
             .rune_index = futhark::letter_to_index('u');
 
         app.world_mut().write_message(EnterActiveRuneWord);
-        app.update();
-        for _ in 0..24 {
+        for _ in 0..30 {
+            app.update();
             if app
                 .world()
                 .resource::<BattleState>()
@@ -471,23 +496,11 @@ mod tests {
             {
                 break;
             }
-            app.update();
         }
 
-        let first_top = app
-            .world()
-            .entity(first_row_slots[0])
-            .get::<Node>()
-            .unwrap()
-            .top;
-        let second_top = app
-            .world()
-            .entity(second_row_slots[0])
-            .get::<Node>()
-            .unwrap()
-            .top;
-        assert_eq!(first_top, Val::Px(ACTIVE_ROW_TOP - ROW_RISE * 2.0));
-        assert_eq!(second_top, Val::Px(ACTIVE_ROW_TOP - ROW_RISE));
+        let state = app.world().resource::<BattleState>();
+        assert_eq!(state.resolved_rows, 2, "two rows should have been resolved");
+        assert_eq!(state.active_row_slots.len(), 5, "fresh row should be ready");
     }
 
     #[test]
