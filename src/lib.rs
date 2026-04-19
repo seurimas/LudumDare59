@@ -67,6 +67,16 @@ pub struct GameAssets {
     pub robed: Handle<Image>,
     #[asset(texture_atlas_layout(tile_size_x = 64, tile_size_y = 64, columns = 2, rows = 2))]
     pub robed_layout: Handle<TextureAtlasLayout>,
+    #[asset(path = "fonts/CormorantUnicase-SemiBold.ttf")]
+    pub font_cormorant_unicase_semibold: Handle<Font>,
+    #[asset(path = "fonts/CormorantUnicase-Bold.ttf")]
+    pub font_cormorant_unicase_bold: Handle<Font>,
+    #[asset(path = "fonts/CormorantGaramond-Italic-VariableFont_wght.ttf")]
+    pub font_cormorant_garamond_italic: Handle<Font>,
+    #[asset(path = "fonts/IMFellDWPicaSC-Regular.ttf")]
+    pub font_im_fell_sc: Handle<Font>,
+    #[asset(path = "fonts/UnifrakturMaguntia-Regular.ttf")]
+    pub font_unifraktur: Handle<Font>,
 }
 
 pub fn configure_app(app: &mut App) {
@@ -74,8 +84,7 @@ pub fn configure_app(app: &mut App) {
     futhark::configure_futhark_keyboard(app);
     rune_words::rune_slots::configure_rune_slots(app);
     combat::configure_combat(app);
-    ui::clock::configure_clock(app);
-    ui::health::configure_health(app);
+    ui::configure_ui(app);
 
     app.add_systems(
         Update,

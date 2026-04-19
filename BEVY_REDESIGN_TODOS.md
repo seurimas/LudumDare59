@@ -19,13 +19,17 @@ dependency order. Check items off as they are completed.
 - [x] Add health state: `PlayerHealthState { hp, max }` as a `Resource`
       (`src/ui/health.rs`); `NpcHealthState { hp, max }` as a `Component`
       attached to the NPC sprite entity — stub with fixed values initially
-- [ ] Register all new fonts and image assets in `GameAssets`
-      (`src/loading.rs`) via `bevy_asset_loader` `#[asset(...)]` fields
-      (fonts: CormorantUnicase SemiBold/Bold, Cormorant Garamond Italic,
-      IM Fell DW Pica SC, UnifrakturMaguntia; images: parchment_tile,
-      corner_bracket, vignette, sigils)
-- [ ] Add a `set_nearest_samplers` startup system (runs `OnEnter(GameState::Ready)`)
-      that sets `ImageSampler::nearest()` on backdrop, goblin, and robed handles
+- [x] Register all new fonts in `GameAssets` (`src/lib.rs`) via
+      `bevy_asset_loader` `#[asset(...)]` fields (CormorantUnicase
+      SemiBold/Bold, CormorantGaramond Italic variable, IM Fell DW Pica SC,
+      UnifrakturMaguntia Regular)
+- [ ] Register image assets in `GameAssets` (parchment_tile, corner_bracket,
+      vignette, sigils + sigils_layout). **Blocked**: art PNGs do not yet exist
+      in `assets/images/`. Create the files first, then add `#[asset(...)]`
+      fields.
+- [x] Add a `set_nearest_samplers` startup system (runs
+      `OnEnter(GameState::Ready)`) in `src/ui/samplers.rs` that sets
+      `ImageSampler::nearest()` on backdrop, goblin, and robed handles
 
 ---
 

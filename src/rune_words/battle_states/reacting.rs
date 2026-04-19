@@ -325,6 +325,11 @@ mod tests {
             goblin_layout: Handle::default(),
             robed: Handle::default(),
             robed_layout: Handle::default(),
+            font_cormorant_unicase_semibold: Handle::default(),
+            font_cormorant_unicase_bold: Handle::default(),
+            font_cormorant_garamond_italic: Handle::default(),
+            font_im_fell_sc: Handle::default(),
+            font_unifraktur: Handle::default(),
         });
         app
     }
