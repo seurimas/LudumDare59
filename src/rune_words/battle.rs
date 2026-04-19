@@ -59,7 +59,7 @@ pub struct BattleState {
 #[derive(Clone)]
 struct QueuedLetterPlaybackStep {
     slot_entity: Entity,
-    color: Color,
+    match_state: RuneMatchState,
     handle: Option<Handle<AudioSource>>,
     duration_seconds: f32,
 }
@@ -68,7 +68,7 @@ struct QueuedLetterPlaybackStep {
 struct QueuedRowGrading {
     row_id: u32,
     row_slots: Vec<Entity>,
-    slot_results: Vec<(Entity, Color)>,
+    slot_results: Vec<(Entity, RuneMatchState)>,
     steps: Vec<QueuedLetterPlaybackStep>,
     current_step: usize,
     elapsed_seconds: f32,
@@ -139,11 +139,11 @@ pub fn queue_row_grading_playback(
     prebaked_audio: Option<&crate::futhark::PrebakedFutharkConversationalAudio>,
     baked_samples: Option<&crate::futhark::BakedAudioSamples>,
 ) {
-    let slot_results: Vec<(Entity, Color)> = row_slots
+    let slot_results: Vec<(Entity, RuneMatchState)> = row_slots
         .iter()
         .copied()
         .zip(results.iter().copied())
-        .map(|(entity, result)| (entity, result.background_color()))
+        .map(|(entity, result)| (entity, result))
         .collect();
 
     let mut steps = Vec::new();
@@ -173,7 +173,7 @@ pub fn queue_row_grading_playback(
 
         steps.push(QueuedLetterPlaybackStep {
             slot_entity: entity,
-            color: result.background_color(),
+            match_state: result,
             handle,
             duration_seconds,
         });
@@ -258,7 +258,7 @@ fn tick_pending_row_grading(
                 if let Some(step) = queued.steps.first() {
                     tint_slot(
                         step.slot_entity,
-                        step.color,
+                        step.match_state.background_color(),
                         &slot_children,
                         &mut backgrounds,
                     );
@@ -287,7 +287,7 @@ fn tick_pending_row_grading(
                 let step = &queued.steps[queued.current_step];
                 tint_slot(
                     step.slot_entity,
-                    step.color,
+                    step.match_state.background_color(),
                     &slot_children,
                     &mut backgrounds,
                 );
@@ -312,8 +312,13 @@ fn tick_pending_row_grading(
         return;
     };
 
-    for (entity, color) in queued.slot_results {
-        tint_slot(entity, color, &slot_children, &mut backgrounds);
+    for (entity, match_state) in queued.slot_results {
+        tint_slot(
+            entity,
+            match_state.background_color(),
+            &slot_children,
+            &mut backgrounds,
+        );
     }
 
     begin_row_resolution_animation(

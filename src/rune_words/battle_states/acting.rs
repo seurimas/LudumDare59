@@ -6,9 +6,7 @@ use crate::rune_words::battle::{
     RowResolved, RuneMatchState, collect_guess_submission, queue_row_grading_playback,
     reset_battle_state, score_guess_submission, spawn_battle_row,
 };
-use crate::rune_words::rune_slots::{
-    ActiveRuneSlot, EnterActiveRuneWord, RuneSlot,
-};
+use crate::rune_words::rune_slots::{ActiveRuneSlot, EnterActiveRuneWord, RuneSlot};
 use crate::{GameAssets, dictionary};
 
 #[derive(bevy::ecs::message::Message, Clone, Debug)]
@@ -28,6 +26,7 @@ pub struct ActingData {
     pub max_rune_count: usize,
     pub pending_success: bool,
     pub pending_matched: Option<dictionary::Futharkation>,
+    pub grading_against_letters: Option<String>,
 }
 
 #[derive(Component)]
@@ -36,11 +35,22 @@ pub struct ActingCountLabel;
 #[derive(Component)]
 pub struct ActingBookPanel;
 
+#[derive(Component)]
+pub struct ActingBookEntry {
+    pub letters: String,
+}
+
+#[derive(Component)]
+pub struct ActingBookEntryBackground {
+    pub base_color: Color,
+}
+
 pub fn configure_acting(app: &mut App) {
     app.init_resource::<ActingData>();
     app.add_message::<StartActing>();
     app.add_message::<ActingSucceeded>();
     app.add_systems(Update, cleanup_acting_book_outside_phase);
+    app.add_systems(Update, animate_acting_book_grading_highlight.run_if(is_acting));
     app.add_systems(
         Update,
         (start_acting, score_acting_row_on_enter.run_if(is_acting)).chain(),
@@ -94,6 +104,7 @@ fn start_acting(
     acting_data.max_rune_count = max_rune_count;
     acting_data.pending_success = false;
     acting_data.pending_matched = None;
+    acting_data.grading_against_letters = None;
 
     let row = spawn_battle_row(
         &mut commands,
@@ -112,6 +123,7 @@ fn start_acting(
 
 fn spawn_acting_book_panel(commands: &mut Commands, targets: &[dictionary::Futharkation]) {
     let entries = first_four_book_entries(targets);
+    let entry_base_color = Color::srgba(0.14, 0.2, 0.36, 0.92);
 
     commands
         .spawn((
@@ -152,14 +164,17 @@ fn spawn_acting_book_panel(commands: &mut Commands, targets: &[dictionary::Futha
                                 None => "-".to_string(),
                             };
 
-                            grid_row.spawn((
+                            let mut node = grid_row.spawn((
                                 Node {
                                     width: Val::Px(150.0),
                                     min_height: Val::Px(56.0),
                                     padding: UiRect::all(Val::Px(6.0)),
                                     ..default()
                                 },
-                                BackgroundColor(Color::srgba(0.14, 0.2, 0.36, 0.92)),
+                                BackgroundColor(entry_base_color),
+                                ActingBookEntryBackground {
+                                    base_color: entry_base_color,
+                                },
                                 children![(
                                     Text::new(label),
                                     TextFont {
@@ -169,10 +184,51 @@ fn spawn_acting_book_panel(commands: &mut Commands, targets: &[dictionary::Futha
                                     TextColor(Color::WHITE),
                                 )],
                             ));
+
+                            if let Some(word) = entry {
+                                node.insert(ActingBookEntry {
+                                    letters: word.letters.clone(),
+                                });
+                            }
                         }
                     });
             }
         });
+}
+
+fn animate_acting_book_grading_highlight(
+    time: Res<Time>,
+    pending_grading: Res<PendingRowGrading>,
+    speed: Option<Res<crate::futhark::FutharkKeyboardAnimationSpeed>>,
+    acting_data: Res<ActingData>,
+    mut entries: Query<
+        (
+            &mut BackgroundColor,
+            &ActingBookEntryBackground,
+            Option<&ActingBookEntry>,
+        ),
+        With<ActingBookEntryBackground>,
+    >,
+) {
+    let hue_speed = speed
+        .as_ref()
+        .map(|s| s.hue_degrees_per_second)
+        .unwrap_or(30.0);
+    let rune_color = Color::hsl((time.elapsed_secs() * hue_speed) % 360.0, 1.0, 0.5);
+
+    for (mut bg, base, entry) in &mut entries {
+        let is_target = pending_grading.is_active()
+            && acting_data
+                .grading_against_letters
+                .as_deref()
+                .is_some_and(|letters| {
+                    entry
+                        .map(|book_entry| book_entry.letters.as_str() == letters)
+                        .unwrap_or(false)
+                });
+
+        bg.0 = if is_target { rune_color } else { base.base_color };
+    }
 }
 
 fn cleanup_acting_book_outside_phase(
@@ -253,6 +309,8 @@ fn score_acting_row_on_enter(
         baked_samples.as_deref(),
     );
 
+    acting_data.grading_against_letters = Some(best_target.letters.clone());
+
     acting_data.pending_success = correct >= 2;
     if acting_data.pending_success {
         acting_data.pending_matched = Some(best_target);
@@ -277,6 +335,7 @@ fn on_acting_row_resolved(
         return;
     }
     row_resolved.clear();
+    acting_data.grading_against_letters = None;
 
     if acting_data.pending_success {
         let matched = acting_data.pending_matched.take().unwrap_or_else(|| {
