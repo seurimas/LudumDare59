@@ -78,10 +78,17 @@ fn npc_image(npc_type: NpcType, game_assets: &GameAssets) -> ImageNode {
 fn sync_npc_sprite(
     mut commands: Commands,
     game_assets: Res<GameAssets>,
-    battle_state: Res<BattleState>,
+    battle_state: Option<Res<BattleState>>,
     scene: Query<Entity, With<CombatScene>>,
     mut npc_query: Query<(Entity, &mut ImageNode), With<NpcSprite>>,
 ) {
+    let Some(battle_state) = battle_state else {
+        for (entity, _) in &npc_query {
+            commands.entity(entity).despawn();
+        }
+        return;
+    };
+
     let should_show =
         battle_state.npc_type.is_some() && !matches!(battle_state.phase, BattlePhase::Idle);
 

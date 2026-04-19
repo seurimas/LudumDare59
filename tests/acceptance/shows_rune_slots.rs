@@ -2,6 +2,7 @@ use LudumDare59::{
     GameAssets, GameState, acceptance, configure_app, configure_loading,
     futhark::{FutharkKeyboardAnimationSpeed, spawn_futhark_keyboard},
     rune_words::rune_slots::{RuneSlotConfig, RuneSlotForegroundSet, spawn_rune_slot},
+    ui::hud_root::spawn_battle_hud_root,
 };
 use bevy::prelude::*;
 
@@ -13,7 +14,10 @@ fn main() {
     configure_app(&mut app);
     configure_loading(&mut app);
 
-    app.add_systems(OnEnter(GameState::Ready), spawn_futhark_keyboard);
+    app.add_systems(
+        OnEnter(GameState::Ready),
+        spawn_futhark_keyboard.after(spawn_battle_hud_root),
+    );
     app.add_systems(OnEnter(GameState::Ready), spawn_demo_rune_slots);
 
     acceptance::initialize_app(

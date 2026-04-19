@@ -4,6 +4,7 @@ use LudumDare59::{
     rune_words::rune_slots::{
         ActiveRuneSlot, RuneSlotConfig, RuneSlotForegroundSet, spawn_rune_word,
     },
+    ui::hud_root::spawn_battle_hud_root,
 };
 use bevy::prelude::*;
 
@@ -15,7 +16,10 @@ fn main() {
     configure_app(&mut app);
     configure_loading(&mut app);
 
-    app.add_systems(OnEnter(GameState::Ready), spawn_futhark_keyboard);
+    app.add_systems(
+        OnEnter(GameState::Ready),
+        spawn_futhark_keyboard.after(spawn_battle_hud_root),
+    );
     app.add_systems(OnEnter(GameState::Ready), spawn_word_demo);
 
     acceptance::initialize_app(

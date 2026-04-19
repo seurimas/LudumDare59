@@ -2,6 +2,7 @@ use LudumDare59::{
     GameState, acceptance, configure_app, configure_loading, dictionary,
     futhark::{FutharkKeyboardAnimationSpeed, spawn_futhark_keyboard},
     rune_words::battle::{StartBattle, configure_battle},
+    ui::hud_root::spawn_battle_hud_root,
 };
 use bevy::ecs::message::MessageWriter;
 use bevy::prelude::*;
@@ -15,7 +16,10 @@ fn main() {
     configure_loading(&mut app);
     configure_battle(&mut app);
 
-    app.add_systems(OnEnter(GameState::Ready), spawn_futhark_keyboard);
+    app.add_systems(
+        OnEnter(GameState::Ready),
+        spawn_futhark_keyboard.after(spawn_battle_hud_root),
+    );
     app.add_systems(OnEnter(GameState::Ready), start_random_battle_demo);
 
     acceptance::initialize_app(

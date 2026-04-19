@@ -3,6 +3,7 @@ use bevy::prelude::*;
 pub mod clock;
 pub mod health;
 pub mod hud_root;
+pub mod keyboard;
 pub mod palette;
 pub mod samplers;
 

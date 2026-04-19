@@ -16,6 +16,9 @@ pub struct CombatBar;
 pub struct LeftColumn;
 
 #[derive(Component)]
+pub struct InscribedPanel;
+
+#[derive(Component)]
 pub struct ArenaPanel;
 
 #[derive(Component)]
@@ -28,7 +31,7 @@ pub fn configure_hud_root(app: &mut App) {
     app.add_systems(OnEnter(GameState::Ready), spawn_battle_hud_root);
 }
 
-fn spawn_battle_hud_root(mut commands: Commands) {
+pub fn spawn_battle_hud_root(mut commands: Commands) {
     commands
         .spawn((
             BattleHudWrapper,
@@ -82,14 +85,26 @@ fn spawn_battle_hud_root(mut commands: Commands) {
                             grid_row: GridPlacement::start(2),
                             flex_direction: FlexDirection::Column,
                             row_gap: Val::Percent(1.0),
-                            border: UiRect::all(Val::Px(1.0)),
-                            padding: UiRect::all(Val::Percent(0.6)),
                             ..default()
                         },
-                        placeholder_background(),
-                        placeholder_border_color(),
-                        children![placeholder_label("Left Column")],
-                    ));
+                    ))
+                    .with_children(|left_column| {
+                        left_column.spawn((
+                            InscribedPanel,
+                            Node {
+                                flex_grow: 1.0,
+                                flex_basis: Val::Px(0.0),
+                                justify_content: JustifyContent::Center,
+                                align_items: AlignItems::Center,
+                                border: UiRect::all(Val::Px(1.0)),
+                                padding: UiRect::all(Val::Percent(0.6)),
+                                ..default()
+                            },
+                            placeholder_background(),
+                            placeholder_border_color(),
+                            children![placeholder_label("Inscribed Attempts")],
+                        ));
+                    });
 
                     grid.spawn((
                         ArenaPanel,

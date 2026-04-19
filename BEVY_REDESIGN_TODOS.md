@@ -54,18 +54,22 @@ dependency order. Check items off as they are completed.
 ## 3. Rune Keyboard (Left Column — Lower)
 
 > Mostly relocating existing code; the logic itself does not change.
+> Keyboard widget code was moved out of `src/futhark.rs` into a dedicated
+> `src/ui/keyboard.rs` module. `futhark.rs` re-exports the public API so
+> existing callers (game code + UATs) keep working without churn.
 
-- [ ] Wrap existing keyboard spawn in a `KeyboardPanel` node that is a flex
-      child of `LeftColumn` (flex: 0, auto height) instead of absolute
-      top-left positioning
-- [ ] Replace pixel-absolute key positions with percent-relative
+- [x] Wrap existing keyboard spawn in a `KeyboardPanel` node that is a flex
+      child of `LeftColumn` (percent-sized, scales to column width) instead
+      of absolute top-left positioning
+- [x] Replace pixel-absolute key positions with percent-relative
       `padding_left` on each key row, preserving the existing row offsets
-      as proportions of panel width
-- [ ] Add panel header row: "Rune Keyboard" (Cormorant Unicase SemiBold,
+      as proportions of panel width. Key sizes are also percent-based
+      (keys 8% wide, wide keys 13.3%, square via `aspect_ratio`).
+- [x] Add panel header row: "Rune Keyboard" (Cormorant Unicase SemiBold,
       GOLD_LIGHT) + "tab · legend" aside (IM Fell SC italic, PARCHMENT_DARK)
-- [ ] Verify `FutharkKeyBackground`, `FutharkKeyRuneVisual`,
+- [x] Verify `FutharkKeyBackground`, `FutharkKeyRuneVisual`,
       `FutharkKeyLetterVisual` components still work after reparenting
-- [ ] Run `uat_shows_futhark_rune` and `uat_shows_rune_word_navigation`
+- [x] Run `uat_shows_futhark_rune` and `uat_shows_rune_word_navigation`
       and confirm zero exit
 
 ---

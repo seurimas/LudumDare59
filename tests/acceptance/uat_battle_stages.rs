@@ -9,6 +9,7 @@ use LudumDare59::{
             reacting::{ReactingFailed, ReactingSucceeded, StartReacting},
         },
     },
+    ui::hud_root::spawn_battle_hud_root,
 };
 use bevy::ecs::message::{MessageReader, MessageWriter};
 use bevy::prelude::*;
@@ -27,7 +28,10 @@ fn main() {
     app.init_resource::<StageFlow>();
     app.add_message::<QuickTime>();
 
-    app.add_systems(OnEnter(GameState::Ready), spawn_futhark_keyboard);
+    app.add_systems(
+        OnEnter(GameState::Ready),
+        spawn_futhark_keyboard.after(spawn_battle_hud_root),
+    );
     app.add_systems(OnEnter(GameState::Ready), setup_demo);
     app.add_systems(Update, demo_controller.run_if(in_state(GameState::Ready)));
     app.add_systems(
