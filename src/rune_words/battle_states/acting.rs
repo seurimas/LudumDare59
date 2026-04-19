@@ -50,7 +50,10 @@ pub fn configure_acting(app: &mut App) {
     app.add_message::<StartActing>();
     app.add_message::<ActingSucceeded>();
     app.add_systems(Update, cleanup_acting_book_outside_phase);
-    app.add_systems(Update, animate_acting_book_grading_highlight.run_if(is_acting));
+    app.add_systems(
+        Update,
+        animate_acting_book_grading_highlight.run_if(is_acting),
+    );
     app.add_systems(
         Update,
         (start_acting, score_acting_row_on_enter.run_if(is_acting)).chain(),
@@ -227,7 +230,11 @@ fn animate_acting_book_grading_highlight(
                         .unwrap_or(false)
                 });
 
-        bg.0 = if is_target { rune_color } else { base.base_color };
+        bg.0 = if is_target {
+            rune_color
+        } else {
+            base.base_color
+        };
     }
 }
 
@@ -406,8 +413,13 @@ mod tests {
     fn make_test_app() -> App {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
+        futhark::configure_futhark_keyboard(&mut app);
         configure_rune_slots(&mut app);
         configure_battle(&mut app);
+        app.add_systems(
+            Update,
+            crate::rune_words::rune_slots::update_active_rune_slot_from_typed_input,
+        );
         app.insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_millis(
             100,
         )));
@@ -434,6 +446,25 @@ mod tests {
                 .expect("slot")
                 .rune_index = futhark::letter_to_index(letter);
         }
+    }
+
+    fn active_row_letters(app: &mut App) -> Vec<Option<char>> {
+        let slots = app
+            .world()
+            .resource::<BattleState>()
+            .active_row_slots
+            .clone();
+
+        slots
+            .into_iter()
+            .map(|entity| {
+                app.world()
+                    .entity(entity)
+                    .get::<RuneSlot>()
+                    .and_then(|slot| slot.rune_index)
+                    .and_then(futhark::index_to_letter)
+            })
+            .collect()
     }
 
     fn futha(word: &str, letters: &str) -> dictionary::Futharkation {
@@ -653,6 +684,72 @@ mod tests {
 
         let top = app.world().entity(first_row[0]).get::<Node>().unwrap().top;
         assert_eq!(top, Val::Px(ACTIVE_ROW_TOP - ROW_RISE));
+    }
+
+    #[test]
+    fn acting_failure_queues_typed_input_for_next_row_in_order() {
+        let mut app = make_test_app();
+        app.world_mut().write_message(StartActing {
+            targets: vec![futha("fable", "futar")],
+        });
+        app.update();
+
+        // Force failure (fewer than 2 correct).
+        fill_active_row(&mut app, "fxxxx");
+        app.world_mut().write_message(EnterActiveRuneWord);
+        app.update();
+
+        app.world_mut()
+            .write_message(futhark::TypedFutharkInput('u'));
+        app.world_mut()
+            .write_message(futhark::TypedFutharkInput('t'));
+        app.world_mut()
+            .write_message(futhark::TypedFutharkInput('a'));
+
+        for _ in 0..12 {
+            app.update();
+        }
+
+        let row = active_row_letters(&mut app);
+        assert_eq!(row[0], Some('u'));
+        assert_eq!(row[1], Some('t'));
+        assert_eq!(row[2], Some('a'));
+    }
+
+    #[test]
+    fn acting_success_ignores_typed_input_during_grading_animation() {
+        let mut app = make_test_app();
+        app.world_mut().write_message(StartActing {
+            targets: vec![futha("fable", "futar")],
+        });
+        app.update();
+
+        fill_active_row(&mut app, "futxx");
+        app.world_mut().write_message(EnterActiveRuneWord);
+        app.update();
+
+        app.world_mut()
+            .write_message(futhark::TypedFutharkInput('u'));
+        app.world_mut()
+            .write_message(futhark::TypedFutharkInput('t'));
+
+        for _ in 0..12 {
+            app.update();
+        }
+
+        assert_eq!(
+            app.world().resource::<BattleState>().phase,
+            BattlePhase::Idle
+        );
+
+        // Start a fresh acting round and verify no buffered input leaked through.
+        app.world_mut().write_message(StartActing {
+            targets: vec![futha("again", "futar")],
+        });
+        app.update();
+
+        let row = active_row_letters(&mut app);
+        assert!(row.into_iter().all(|letter| letter.is_none()));
     }
 
     #[test]

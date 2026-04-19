@@ -59,6 +59,7 @@ pub struct BattleState {
 #[derive(Clone)]
 struct QueuedLetterPlaybackStep {
     slot_entity: Entity,
+    letter: char,
     match_state: RuneMatchState,
     handle: Option<Handle<AudioSource>>,
     duration_seconds: f32,
@@ -102,10 +103,18 @@ pub struct BattleRowMotion {
 #[derive(bevy::ecs::message::Message, Clone, Debug)]
 pub struct RowResolved(pub u32);
 
+#[derive(bevy::ecs::message::Message, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RowLetterGraded {
+    pub row_id: u32,
+    pub letter: char,
+    pub match_state: RuneMatchState,
+}
+
 pub fn configure_battle(app: &mut App) {
     app.init_resource::<BattleState>();
     app.init_resource::<PendingRowGrading>();
     app.add_message::<RowResolved>();
+    app.add_message::<RowLetterGraded>();
     app.configure_sets(
         Update,
         BattleSet::CheckAnimations.before(BattleSet::PostAnimation),
@@ -173,6 +182,7 @@ pub fn queue_row_grading_playback(
 
         steps.push(QueuedLetterPlaybackStep {
             slot_entity: entity,
+            letter,
             match_state: result,
             handle,
             duration_seconds,
@@ -238,6 +248,7 @@ fn tick_pending_row_grading(
     time: Res<Time>,
     mut battle_state: ResMut<BattleState>,
     mut pending: ResMut<PendingRowGrading>,
+    mut row_letter_graded: MessageWriter<RowLetterGraded>,
     slot_nodes: Query<(Entity, &Node), With<BattleRuneSlot>>,
     slot_children: Query<&Children>,
     mut backgrounds: Query<&mut RuneSlotBackground>,
@@ -262,6 +273,11 @@ fn tick_pending_row_grading(
                         &slot_children,
                         &mut backgrounds,
                     );
+                    row_letter_graded.write(RowLetterGraded {
+                        row_id: queued.row_id,
+                        letter: step.letter,
+                        match_state: step.match_state,
+                    });
                     if let Some(handle) = step.handle.clone() {
                         commands.spawn((
                             AudioPlayer::<AudioSource>(handle),
@@ -291,6 +307,11 @@ fn tick_pending_row_grading(
                     &slot_children,
                     &mut backgrounds,
                 );
+                row_letter_graded.write(RowLetterGraded {
+                    row_id: queued.row_id,
+                    letter: step.letter,
+                    match_state: step.match_state,
+                });
                 if let Some(handle) = step.handle.clone() {
                     commands.spawn((
                         AudioPlayer::<AudioSource>(handle),

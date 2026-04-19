@@ -1,10 +1,11 @@
 use bevy::ecs::message::{MessageReader, MessageWriter};
 use bevy::prelude::*;
+use std::collections::{HashMap, HashSet};
 
 use crate::rune_words::battle::{
     ACTIVE_ROW_TOP, BattlePhase, BattleRuneSlot, BattleSet, BattleState, PendingRowGrading,
-    RowResolved, RuneMatchState, collect_guess_submission, queue_row_grading_playback,
-    reset_battle_state, score_guess_submission, spawn_battle_row,
+    RowLetterGraded, RowResolved, RuneMatchState, collect_guess_submission,
+    queue_row_grading_playback, reset_battle_state, score_guess_submission, spawn_battle_row,
 };
 use crate::rune_words::rune_slots::{ActiveRuneSlot, EnterActiveRuneWord, RuneSlot};
 use crate::{GameAssets, dictionary};
@@ -19,6 +20,7 @@ pub struct BindingSucceeded;
 pub struct BindingData {
     pub target: Option<dictionary::Futharkation>,
     pub pending_success: bool,
+    pending_eliminations_by_row: HashMap<u32, HashSet<char>>,
 }
 
 pub fn configure_binding(app: &mut App) {
@@ -31,10 +33,39 @@ pub fn configure_binding(app: &mut App) {
     );
     app.add_systems(
         Update,
-        on_binding_row_resolved
+        (
+            apply_binding_key_eliminations_from_grading,
+            on_binding_row_resolved,
+        )
+            .chain()
             .run_if(is_binding)
             .in_set(BattleSet::PostAnimation),
     );
+}
+
+fn letters_eliminated_in_row(guess: &[Option<char>], results: &[RuneMatchState]) -> HashSet<char> {
+    let mut missing_letters = HashSet::new();
+    let mut non_missing_letters = HashSet::new();
+
+    for (guess_letter, result) in guess.iter().copied().zip(results.iter().copied()) {
+        let Some(guess_letter) = guess_letter else {
+            continue;
+        };
+
+        match result {
+            RuneMatchState::Missing => {
+                missing_letters.insert(guess_letter);
+            }
+            RuneMatchState::Present | RuneMatchState::Correct => {
+                non_missing_letters.insert(guess_letter);
+            }
+        }
+    }
+
+    missing_letters
+        .difference(&non_missing_letters)
+        .copied()
+        .collect()
 }
 
 fn is_binding(state: Res<BattleState>) -> bool {
@@ -49,6 +80,7 @@ fn start_binding(
     mut battle_state: ResMut<BattleState>,
     mut binding_data: ResMut<BindingData>,
     mut active_slot: ResMut<ActiveRuneSlot>,
+    eliminated_keys: Option<ResMut<crate::futhark::EliminatedFutharkKeys>>,
 ) {
     let Some(game_assets) = game_assets else {
         return;
@@ -60,6 +92,10 @@ fn start_binding(
     reset_battle_state(&mut commands, &mut battle_state, existing_rows.iter());
     battle_state.phase = BattlePhase::Binding;
     binding_data.target = Some(target.clone());
+    binding_data.pending_eliminations_by_row.clear();
+    if let Some(mut eliminated_keys) = eliminated_keys {
+        eliminated_keys.clear();
+    }
 
     let row = spawn_battle_row(
         &mut commands,
@@ -109,6 +145,7 @@ fn score_binding_row_on_enter(
     let row_id = battle_slot.row_id;
 
     let results = score_guess_submission(&guess, &target.letters);
+    let letters_to_eliminate = letters_eliminated_in_row(&guess, &results);
     let all_correct = results.iter().all(|r| matches!(r, RuneMatchState::Correct));
 
     queue_row_grading_playback(
@@ -121,10 +158,49 @@ fn score_binding_row_on_enter(
         baked_samples.as_deref(),
     );
 
+    if !letters_to_eliminate.is_empty() {
+        binding_data
+            .pending_eliminations_by_row
+            .insert(row_id, letters_to_eliminate);
+    }
+
     active_slot.entity = None;
 
     binding_data.pending_success = all_correct;
     battle_state.active_row_slots.clear();
+}
+
+fn apply_binding_key_eliminations_from_grading(
+    mut graded_events: MessageReader<RowLetterGraded>,
+    mut binding_data: ResMut<BindingData>,
+    eliminated_keys: Option<ResMut<crate::futhark::EliminatedFutharkKeys>>,
+) {
+    let Some(mut eliminated_keys) = eliminated_keys else {
+        return;
+    };
+
+    for graded in graded_events.read() {
+        if graded.match_state != RuneMatchState::Missing {
+            continue;
+        }
+
+        let mut remove_row_entry = false;
+        if let Some(letters) = binding_data
+            .pending_eliminations_by_row
+            .get_mut(&graded.row_id)
+        {
+            if letters.remove(&graded.letter) {
+                eliminated_keys.insert(graded.letter);
+            }
+            remove_row_entry = letters.is_empty();
+        }
+
+        if remove_row_entry {
+            binding_data
+                .pending_eliminations_by_row
+                .remove(&graded.row_id);
+        }
+    }
 }
 
 fn on_binding_row_resolved(
@@ -178,6 +254,28 @@ mod tests {
     use crate::rune_words::rune_slots::{RuneSlotBackground, configure_rune_slots};
     use bevy::time::TimeUpdateStrategy;
     use std::time::Duration;
+
+    #[test]
+    fn duplicate_letters_are_not_eliminated_if_any_copy_is_non_missing() {
+        let guess = vec![Some('r'), Some('r')];
+        let results = vec![RuneMatchState::Missing, RuneMatchState::Correct];
+
+        let eliminated = letters_eliminated_in_row(&guess, &results);
+        assert!(eliminated.is_empty());
+    }
+
+    #[test]
+    fn missing_letters_without_non_missing_copy_are_eliminated() {
+        let guess = vec![Some('k'), Some('r'), Some('r')];
+        let results = vec![
+            RuneMatchState::Missing,
+            RuneMatchState::Missing,
+            RuneMatchState::Correct,
+        ];
+
+        let eliminated = letters_eliminated_in_row(&guess, &results);
+        assert_eq!(eliminated, HashSet::from(['k']));
+    }
 
     fn make_test_app() -> App {
         let mut app = App::new();

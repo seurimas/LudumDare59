@@ -101,11 +101,98 @@ pub struct WordAudioQueue {
     current_duration: f32,
 }
 
+#[derive(Resource, Default)]
+pub struct QueuedTypedInput {
+    queued: VecDeque<char>,
+}
+
+#[derive(bevy::ecs::message::Message, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TypedInputDuringGrading(pub char);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TypedInputPolicy {
+    AcceptNormally,
+    Ignore,
+    QueueForNextWord,
+}
+
 pub fn configure_rune_slots(app: &mut App) {
     app.init_resource::<ActiveRuneSlot>();
     app.init_resource::<WordAudioQueue>();
+    app.init_resource::<QueuedTypedInput>();
     app.add_message::<EnterActiveRuneWord>();
     app.add_message::<PlayFutharkLetters>();
+    app.add_message::<TypedInputDuringGrading>();
+}
+
+fn typed_input_during_grading_behavior(
+    battle_state: Option<&crate::rune_words::battle::BattleState>,
+    pending_grading: Option<&crate::rune_words::battle::PendingRowGrading>,
+    acting_data: Option<&crate::rune_words::battle_states::acting::ActingData>,
+    reacting_data: Option<&crate::rune_words::battle_states::reacting::ReactingData>,
+) -> TypedInputPolicy {
+    let Some(state) = battle_state else {
+        return TypedInputPolicy::AcceptNormally;
+    };
+    let Some(pending_grading) = pending_grading else {
+        return TypedInputPolicy::AcceptNormally;
+    };
+
+    let in_submit_animation_window =
+        pending_grading.is_active() || state.active_row_slots.is_empty();
+    if !in_submit_animation_window {
+        return TypedInputPolicy::AcceptNormally;
+    }
+
+    match state.phase {
+        crate::rune_words::battle::BattlePhase::Acting => {
+            if acting_data
+                .map(|data| data.pending_success)
+                .unwrap_or(false)
+            {
+                TypedInputPolicy::Ignore
+            } else {
+                TypedInputPolicy::QueueForNextWord
+            }
+        }
+        crate::rune_words::battle::BattlePhase::Reacting => {
+            if reacting_data
+                .map(|data| data.pending_success)
+                .unwrap_or(false)
+            {
+                TypedInputPolicy::Ignore
+            } else {
+                TypedInputPolicy::QueueForNextWord
+            }
+        }
+        _ => TypedInputPolicy::AcceptNormally,
+    }
+}
+
+fn type_into_active_slot(
+    letter: char,
+    active_slot: &mut ActiveRuneSlot,
+    slots: &mut Query<(&mut RuneSlot, Option<&RuneSlotLinks>)>,
+) -> bool {
+    let Some(active_entity) = active_slot.entity else {
+        return false;
+    };
+
+    let Some(index) = futhark::letter_to_index(letter) else {
+        return false;
+    };
+
+    let Ok((mut slot, links)) = slots.get_mut(active_entity) else {
+        return false;
+    };
+
+    slot.rune_index = Some(index);
+
+    if let Some(next) = links.and_then(|l| l.next) {
+        active_slot.entity = Some(next);
+    }
+
+    true
 }
 
 /// Advance the word audio sequence each frame and spawn the next handle when the
@@ -274,28 +361,42 @@ pub fn activate_rune_slot_on_click(
 pub fn update_active_rune_slot_from_typed_input(
     mut typed_futhark_input: MessageReader<futhark::TypedFutharkInput>,
     mut active_slot: ResMut<ActiveRuneSlot>,
+    mut queued_typed_input: ResMut<QueuedTypedInput>,
+    mut typed_during_grading: MessageWriter<TypedInputDuringGrading>,
     mut slots: Query<(&mut RuneSlot, Option<&RuneSlotLinks>)>,
+    battle_state: Option<Res<crate::rune_words::battle::BattleState>>,
+    pending_grading: Option<Res<crate::rune_words::battle::PendingRowGrading>>,
+    acting_data: Option<Res<crate::rune_words::battle_states::acting::ActingData>>,
+    reacting_data: Option<Res<crate::rune_words::battle_states::reacting::ReactingData>>,
 ) {
-    let Some(last_typed) = futhark::last_typed_futhark_character(&mut typed_futhark_input) else {
+    let typed_letters: Vec<char> = typed_futhark_input.read().map(|event| event.0).collect();
+
+    let behavior = typed_input_during_grading_behavior(
+        battle_state.as_deref(),
+        pending_grading.as_deref(),
+        acting_data.as_deref(),
+        reacting_data.as_deref(),
+    );
+
+    if behavior == TypedInputPolicy::Ignore {
         return;
-    };
+    }
 
-    let Some(active_entity) = active_slot.entity else {
+    if behavior == TypedInputPolicy::QueueForNextWord {
+        queued_typed_input.queued.extend(typed_letters);
         return;
-    };
+    }
 
-    let Some(index) = futhark::letter_to_index(last_typed) else {
-        return;
-    };
+    while let Some(letter) = queued_typed_input.queued.pop_front() {
+        if type_into_active_slot(letter, &mut active_slot, &mut slots) {
+            typed_during_grading.write(TypedInputDuringGrading(letter));
+        }
+    }
 
-    let Ok((mut slot, links)) = slots.get_mut(active_entity) else {
-        return;
-    };
-
-    slot.rune_index = Some(index);
-
-    if let Some(next) = links.and_then(|l| l.next) {
-        active_slot.entity = Some(next);
+    for letter in typed_letters {
+        if type_into_active_slot(letter, &mut active_slot, &mut slots) {
+            typed_during_grading.write(TypedInputDuringGrading(letter));
+        }
     }
 }
 

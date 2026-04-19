@@ -3,7 +3,7 @@ use bevy::input::ButtonState;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::prelude::*;
 use rand::Rng;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::GameAssets;
 
@@ -50,6 +50,17 @@ pub struct FutharkKeyboardButton;
 #[derive(Component)]
 pub struct FutharkKeyButton {
     pub index: usize,
+}
+
+#[derive(Component)]
+pub struct FutharkKeyFade {
+    pub alpha: f32,
+}
+
+impl Default for FutharkKeyFade {
+    fn default() -> Self {
+        Self { alpha: 1.0 }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -110,12 +121,34 @@ impl Default for FutharkKeyboardAnimationSpeed {
 #[derive(Message)]
 pub struct TypedFutharkInput(pub char);
 
+#[derive(Message, Default)]
+pub struct EliminatedKeyPressed;
+
 #[derive(Message, Clone, Copy)]
 pub struct FutharkKeyboardCommand(pub FutharkKeyboardCommandType);
 
 #[derive(Resource, Clone)]
 pub struct FutharkKeyboardAliases {
     alias_to_rune: HashMap<char, char>,
+}
+
+#[derive(Resource, Default)]
+pub struct EliminatedFutharkKeys {
+    letters: HashSet<char>,
+}
+
+impl EliminatedFutharkKeys {
+    pub fn clear(&mut self) {
+        self.letters.clear();
+    }
+
+    pub fn contains(&self, letter: char) -> bool {
+        self.letters.contains(&letter)
+    }
+
+    pub fn insert(&mut self, letter: char) {
+        self.letters.insert(letter);
+    }
 }
 
 impl Default for FutharkKeyboardAliases {
@@ -167,8 +200,21 @@ pub fn configure_futhark_keyboard(app: &mut App) {
     app.init_resource::<FutharkKeyboardLegendMode>();
     app.init_resource::<FutharkKeyboardAnimationSpeed>();
     app.init_resource::<FutharkKeyboardAliases>();
+    app.init_resource::<EliminatedFutharkKeys>();
     app.add_message::<TypedFutharkInput>();
+    app.add_message::<EliminatedKeyPressed>();
     app.add_message::<FutharkKeyboardCommand>();
+}
+
+fn is_eliminated_for_binding(
+    letter: char,
+    eliminated_keys: &EliminatedFutharkKeys,
+    battle_state: Option<&crate::rune_words::battle::BattleState>,
+) -> bool {
+    battle_state
+        .map(|state| state.phase == crate::rune_words::battle::BattlePhase::Binding)
+        .unwrap_or(false)
+        && eliminated_keys.contains(letter)
 }
 
 fn map_typed_char_to_futhark(letter: char, aliases: &FutharkKeyboardAliases) -> Option<char> {
@@ -258,7 +304,7 @@ fn params_to_bake_for_index(
 }
 
 pub fn play_futhark_key_sound(
-    mut typed_futhark_input: MessageReader<TypedFutharkInput>,
+    mut typed_futhark_input: MessageReader<crate::rune_words::rune_slots::TypedInputDuringGrading>,
     prebaked_audio: Option<Res<PrebakedFutharkAudio>>,
     mut commands: Commands,
 ) {
@@ -414,6 +460,7 @@ pub fn spawn_futhark_keyboard(mut commands: Commands, game_assets: Res<GameAsset
                                     BackgroundColor(Color::NONE),
                                     FutharkKeyboardButton,
                                     FutharkKeyButton { index },
+                                    FutharkKeyFade::default(),
                                 ))
                                 .with_children(|key_parent| {
                                     key_parent.spawn((
@@ -547,7 +594,10 @@ pub fn emit_futhark_keyboard_command_from_clicks(
 pub fn emit_typed_futhark_input_from_keyboard(
     mut keyboard_input: MessageReader<KeyboardInput>,
     aliases: Res<FutharkKeyboardAliases>,
+    eliminated_keys: Res<EliminatedFutharkKeys>,
+    battle_state: Option<Res<crate::rune_words::battle::BattleState>>,
     mut typed_futhark_input: MessageWriter<TypedFutharkInput>,
+    mut eliminated_key_pressed: MessageWriter<EliminatedKeyPressed>,
 ) {
     for event in keyboard_input.read() {
         if event.state != ButtonState::Pressed {
@@ -560,7 +610,11 @@ pub fn emit_typed_futhark_input_from_keyboard(
 
         for c in text.chars() {
             if let Some(mapped) = map_typed_char_to_futhark(c, &aliases) {
-                typed_futhark_input.write(TypedFutharkInput(mapped));
+                if is_eliminated_for_binding(mapped, &eliminated_keys, battle_state.as_deref()) {
+                    eliminated_key_pressed.write_default();
+                } else {
+                    typed_futhark_input.write(TypedFutharkInput(mapped));
+                }
             }
         }
     }
@@ -568,12 +622,57 @@ pub fn emit_typed_futhark_input_from_keyboard(
 
 pub fn emit_typed_futhark_input_from_keyboard_clicks(
     keys: Query<(&Interaction, &FutharkKeyButton), (Changed<Interaction>, With<Button>)>,
+    eliminated_keys: Res<EliminatedFutharkKeys>,
+    battle_state: Option<Res<crate::rune_words::battle::BattleState>>,
     mut typed_futhark_input: MessageWriter<TypedFutharkInput>,
+    mut eliminated_key_pressed: MessageWriter<EliminatedKeyPressed>,
 ) {
     for (interaction, key) in &keys {
         if *interaction == Interaction::Pressed {
             if let Some(letter) = index_to_letter(key.index) {
-                typed_futhark_input.write(TypedFutharkInput(letter));
+                if is_eliminated_for_binding(letter, &eliminated_keys, battle_state.as_deref()) {
+                    eliminated_key_pressed.write_default();
+                } else {
+                    typed_futhark_input.write(TypedFutharkInput(letter));
+                }
+            }
+        }
+    }
+}
+
+pub fn sync_eliminated_futhark_keys(
+    time: Res<Time>,
+    battle_state: Option<Res<crate::rune_words::battle::BattleState>>,
+    eliminated_keys: Res<EliminatedFutharkKeys>,
+    mut keys: Query<(&FutharkKeyButton, &mut FutharkKeyFade, &Children), With<Button>>,
+    mut images: Query<&mut ImageNode>,
+    mut text_colors: Query<&mut TextColor>,
+) {
+    let fade_step = (time.delta_secs() / 0.2).clamp(0.0, 1.0);
+
+    for (key_button, mut fade, children) in &mut keys {
+        let Some(letter) = index_to_letter(key_button.index) else {
+            continue;
+        };
+        let should_eliminate =
+            is_eliminated_for_binding(letter, &eliminated_keys, battle_state.as_deref());
+        let target_alpha = if should_eliminate { 0.0 } else { 1.0 };
+
+        if fade.alpha < target_alpha {
+            fade.alpha = (fade.alpha + fade_step).min(target_alpha);
+        } else if fade.alpha > target_alpha {
+            fade.alpha = (fade.alpha - fade_step).max(target_alpha);
+        }
+
+        for child in children.iter() {
+            if let Ok(mut image) = images.get_mut(child) {
+                let srgb = image.color.to_srgba();
+                image.color = Color::srgba(srgb.red, srgb.green, srgb.blue, fade.alpha);
+            }
+
+            if let Ok(mut text_color) = text_colors.get_mut(child) {
+                let srgb = text_color.0.to_srgba();
+                text_color.0 = Color::srgba(srgb.red, srgb.green, srgb.blue, fade.alpha);
             }
         }
     }
@@ -672,6 +771,7 @@ pub fn last_typed_futhark_character(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::rune_words::battle::{BattlePhase, BattleState};
 
     #[test]
     fn index_to_letter_maps_all_futhark_entries() {
@@ -751,5 +851,39 @@ mod tests {
         assert_eq!(keyboard_label_for_letter('T'), ("th".to_owned(), 16.0));
         assert_eq!(keyboard_label_for_letter('N'), ("ng".to_owned(), 16.0));
         assert_eq!(keyboard_label_for_letter('r'), ("r".to_owned(), 24.0));
+    }
+
+    #[test]
+    fn eliminated_keys_only_block_during_binding() {
+        let mut eliminated = EliminatedFutharkKeys::default();
+        eliminated.insert('r');
+
+        let mut battle_state = BattleState::default();
+        battle_state.phase = BattlePhase::Binding;
+        assert!(is_eliminated_for_binding(
+            'r',
+            &eliminated,
+            Some(&battle_state)
+        ));
+
+        battle_state.phase = BattlePhase::Acting;
+        assert!(!is_eliminated_for_binding(
+            'r',
+            &eliminated,
+            Some(&battle_state)
+        ));
+    }
+
+    #[test]
+    fn non_eliminated_keys_are_never_blocked() {
+        let eliminated = EliminatedFutharkKeys::default();
+        let mut battle_state = BattleState::default();
+        battle_state.phase = BattlePhase::Binding;
+
+        assert!(!is_eliminated_for_binding(
+            'r',
+            &eliminated,
+            Some(&battle_state)
+        ));
     }
 }
