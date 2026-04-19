@@ -250,7 +250,6 @@ fn sync_npc_sprite(
     mut commands: Commands,
     game_assets: Res<GameAssets>,
     battle_state: Option<Res<BattleState>>,
-    tutorial: Option<Res<crate::tutorial::TutorialState>>,
     panel_query: Query<Entity, With<ArenaPanel>>,
     mut npc_query: Query<
         (Entity, &mut ImageNode, &NpcCombatState),

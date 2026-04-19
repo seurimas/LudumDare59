@@ -104,10 +104,13 @@ fn handle_tutorial_continue_input(
     mut tutorial: ResMut<TutorialState>,
 ) {
     let step = tutorial.step;
-    // Only Welcome, ExplainSpellbook, ExplainKeyboard respond to Enter / click
+    // Only text-and-continue steps respond to Enter / click
     if !matches!(
         step,
-        TutorialStep::Welcome | TutorialStep::ExplainSpellbook | TutorialStep::ExplainKeyboard
+        TutorialStep::Welcome
+            | TutorialStep::ExplainSpellbook
+            | TutorialStep::ExplainKeyboard
+            | TutorialStep::Done
     ) {
         return;
     }
@@ -128,6 +131,7 @@ fn advance_tutorial_step(
     mut tutorial: ResMut<TutorialState>,
     mut battle_state: ResMut<BattleState>,
     mut player: ResMut<PlayerCombatState>,
+    mut next_state: ResMut<NextState<GameState>>,
     mut battle_start: MessageWriter<BattleStart>,
     mut start_acting: MessageWriter<StartActing>,
     game_assets: Option<Res<GameAssets>>,
@@ -175,6 +179,8 @@ fn advance_tutorial_step(
         }
         TutorialStep::Done => {
             tutorial.active = false;
+            battle_state.phase = BattlePhase::Idle;
+            next_state.set(GameState::MainMenu);
         }
     }
 }
@@ -290,7 +296,6 @@ fn handle_tutorial_bop_success(
 fn handle_tutorial_binding_success(
     mut events: MessageReader<BindingSucceeded>,
     mut tutorial: ResMut<TutorialState>,
-    mut next_state: ResMut<NextState<GameState>>,
     mut battle_state: ResMut<BattleState>,
 ) {
     if tutorial.step != TutorialStep::BindingPhase {
@@ -302,11 +307,9 @@ fn handle_tutorial_binding_success(
         return;
     }
 
-    // Tutorial complete - return to main menu
+    // Show the final message (advance_tutorial_step handles the actual exit)
     tutorial.step = TutorialStep::Done;
-    tutorial.active = false;
     battle_state.phase = BattlePhase::Idle;
-    next_state.set(GameState::MainMenu);
 }
 
 // ─── Tutorial overlay UI ──────────────────────────────────────────────────────
@@ -518,7 +521,11 @@ fn tutorial_step_config(step: TutorialStep) -> (&'static str, bool, HighlightTar
             false,
             HighlightTarget::RuneWordAndBinding,
         ),
-        TutorialStep::Done => ("", false, HighlightTarget::None),
+        TutorialStep::Done => (
+            "You have bound the spirit, but more lurk deeper. Are you ready?",
+            true,
+            HighlightTarget::None,
+        ),
     }
 }
 
