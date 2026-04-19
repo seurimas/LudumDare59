@@ -83,7 +83,6 @@ pub fn configure_app(app: &mut App) {
     app.insert_resource(ClearColor(ui::palette::NIGHT));
     futhark::configure_futhark_keyboard(app);
     rune_words::rune_slots::configure_rune_slots(app);
-    combat::configure_combat(app);
     ui::configure_ui(app);
 
     app.add_systems(

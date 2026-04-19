@@ -105,10 +105,13 @@ pub fn spawn_battle_hud_root(mut commands: Commands) {
 
                     grid.spawn((
                         ArenaPanel,
-                        placeholder_node(GridPlacement::start(2), GridPlacement::start(2)),
-                        placeholder_background(),
-                        placeholder_border_color(),
-                        children![placeholder_label("Arena Panel")],
+                        Node {
+                            grid_column: GridPlacement::start(2),
+                            grid_row: GridPlacement::start(2),
+                            overflow: Overflow::clip(),
+                            border: UiRect::all(Val::Px(1.0)),
+                            ..default()
+                        },
                     ));
 
                     grid.spawn((
