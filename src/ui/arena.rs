@@ -190,7 +190,6 @@ pub fn spawn_arena_ui(
 fn phase_to_sprite_index(phase: BattlePhase) -> usize {
     match phase {
         BattlePhase::Acting => 2,
-        BattlePhase::Reacting => 1,
         BattlePhase::Binding => 3,
         BattlePhase::Idle => 0,
     }
@@ -296,7 +295,6 @@ fn phase_display_name(phase: BattlePhase) -> &'static str {
     match phase {
         BattlePhase::Idle => "Idle",
         BattlePhase::Acting => "Combat",
-        BattlePhase::Reacting => "Reacting",
         BattlePhase::Binding => "Binding",
     }
 }
@@ -318,7 +316,6 @@ fn sync_phase_mark(
     let dot_color = match phase {
         BattlePhase::Idle => Color::srgba(0.4, 0.3, 0.2, 0.6),
         BattlePhase::Acting => BLOOD_BRIGHT.with_alpha(0.9),
-        BattlePhase::Reacting => MANA_BRIGHT.with_alpha(0.9),
         BattlePhase::Binding => GOLD.with_alpha(0.9),
     };
     for mut bg in &mut dot_query {

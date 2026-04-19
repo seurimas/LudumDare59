@@ -1,6 +1,5 @@
 pub mod acting;
 pub mod binding;
-pub mod reacting;
 
 use bevy::prelude::*;
 
@@ -31,5 +30,4 @@ pub fn configure_battle_states(app: &mut App) {
     app.init_resource::<LastGradedWord>();
     binding::configure_binding(app);
     acting::configure_acting(app);
-    reacting::configure_reacting(app);
 }

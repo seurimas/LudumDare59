@@ -6,7 +6,6 @@ use LudumDare59::{
         battle_states::{
             acting::{ActingSucceeded, StartActing},
             binding::{BindingSucceeded, StartBinding},
-            reacting::{ReactingFailed, ReactingSucceeded, StartReacting},
         },
     },
     ui::hud_root::spawn_battle_hud_root,
@@ -36,12 +35,7 @@ fn main() {
     app.add_systems(Update, demo_controller.run_if(in_state(GameState::Ready)));
     app.add_systems(
         Update,
-        (
-            on_quicktime,
-            on_reacting_resolved,
-            on_acting_succeeded,
-            on_binding_succeeded,
-        )
+        (on_quicktime, on_acting_succeeded, on_binding_succeeded)
             .chain()
             .run_if(in_state(GameState::Ready)),
     );
@@ -49,7 +43,7 @@ fn main() {
     acceptance::initialize_app(
         &mut app,
         TEST_ID.into(),
-        "Battle stages UAT: acting loops by default. After QuickTime (reacting), the next acting success transitions to binding.",
+        "Battle stages UAT: acting loops by default. After QuickTime (20s), next acting success transitions to binding.",
     );
 
     app.run();
@@ -66,12 +60,11 @@ struct StageFlow {
 }
 
 #[derive(bevy::ecs::message::Message, Clone, Debug)]
-struct QuickTime(dictionary::Futharkation);
+struct QuickTime;
 
 #[derive(Resource)]
 struct DemoState {
     elapsed: f32,
-    quicktime_word: dictionary::Futharkation,
     quicktime_sent: bool,
 }
 
@@ -90,9 +83,6 @@ fn setup_demo(
         .filter_map(|&len| dictionary::random_futharkation_with_rune_length(len, &mut rng).ok())
         .collect();
 
-    let quicktime_word = dictionary::random_futharkation_with_rune_length(4, &mut rng)
-        .unwrap_or_else(|_| words[0].clone());
-
     speed.hue_degrees_per_second = 45.0;
     book.words = words.clone();
 
@@ -104,7 +94,6 @@ fn setup_demo(
 
     commands.insert_resource(DemoState {
         elapsed: 0.0,
-        quicktime_word: quicktime_word.clone(),
         quicktime_sent: false,
     });
 
@@ -125,17 +114,7 @@ fn setup_demo(
                 TextColor(Color::WHITE),
             ),
             (
-                Text::new(format!(
-                    "QuickTime word at 20s: {} ({})",
-                    quicktime_word.word, quicktime_word.letters
-                )),
-                TextFont { font_size: 18.0, ..default() },
-                TextColor(Color::WHITE),
-            ),
-            (
-                Text::new(
-                    "Flow: acting loops. QuickTime at 20s -> reacting. After that, next acting success -> binding.",
-                ),
+                Text::new("Flow: acting loops. QuickTime at 20s unlocks binding. Next acting success -> binding."),
                 TextFont { font_size: 16.0, ..default() },
                 TextColor(Color::WHITE),
             ),
@@ -156,38 +135,14 @@ fn demo_controller(
     state.elapsed += time.delta_secs();
 
     if !state.quicktime_sent && state.elapsed >= 20.0 {
-        quicktime.write(QuickTime(state.quicktime_word.clone()));
+        quicktime.write(QuickTime);
         state.quicktime_sent = true;
     }
 }
 
-fn on_quicktime(
-    mut quicktime: MessageReader<QuickTime>,
-    mut flow: ResMut<StageFlow>,
-    mut start_reacting: MessageWriter<StartReacting>,
-) {
-    for QuickTime(word) in quicktime.read() {
+fn on_quicktime(mut quicktime: MessageReader<QuickTime>, mut flow: ResMut<StageFlow>) {
+    if quicktime.read().count() > 0 {
         flow.binding_unlocked_by_quicktime = true;
-        start_reacting.write(StartReacting {
-            target: word.clone(),
-            time_limit: 10.0,
-        });
-    }
-}
-
-fn on_reacting_resolved(
-    mut succeeded: MessageReader<ReactingSucceeded>,
-    mut failed: MessageReader<ReactingFailed>,
-    mut start_acting: MessageWriter<StartActing>,
-    book: Res<WordBook>,
-) {
-    let any = !succeeded.is_empty() || !failed.is_empty();
-    succeeded.clear();
-    failed.clear();
-    if any && !book.words.is_empty() {
-        start_acting.write(StartActing {
-            targets: book.words.clone(),
-        });
     }
 }
 
@@ -198,7 +153,7 @@ fn on_acting_succeeded(
     mut start_acting: MessageWriter<StartActing>,
     book: Res<WordBook>,
 ) {
-    let Some(matched) = succeeded.read().last().map(|ev| ev.matched.clone()) else {
+    let Some(_matched) = succeeded.read().last().map(|ev| ev.matched.clone()) else {
         return;
     };
 

@@ -28,7 +28,6 @@ pub enum BattlePhase {
     Idle,
     Binding,
     Acting,
-    Reacting,
 }
 
 impl BattlePhase {
@@ -37,7 +36,6 @@ impl BattlePhase {
             Self::Idle => 0,
             Self::Binding => 0,
             Self::Acting => 1,
-            Self::Reacting => 2,
         }
     }
 }

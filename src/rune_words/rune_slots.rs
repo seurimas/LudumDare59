@@ -129,7 +129,6 @@ fn typed_input_during_grading_behavior(
     battle_state: Option<&crate::rune_words::battle::BattleState>,
     pending_grading: Option<&crate::rune_words::battle::PendingRowGrading>,
     acting_data: Option<&crate::rune_words::battle_states::acting::ActingData>,
-    reacting_data: Option<&crate::rune_words::battle_states::reacting::ReactingData>,
 ) -> TypedInputPolicy {
     let Some(state) = battle_state else {
         return TypedInputPolicy::AcceptNormally;
@@ -147,16 +146,6 @@ fn typed_input_during_grading_behavior(
     match state.phase {
         crate::rune_words::battle::BattlePhase::Acting => {
             if acting_data
-                .map(|data| data.pending_success)
-                .unwrap_or(false)
-            {
-                TypedInputPolicy::Ignore
-            } else {
-                TypedInputPolicy::QueueForNextWord
-            }
-        }
-        crate::rune_words::battle::BattlePhase::Reacting => {
-            if reacting_data
                 .map(|data| data.pending_success)
                 .unwrap_or(false)
             {
@@ -441,7 +430,6 @@ pub fn update_active_rune_slot_from_typed_input(
     battle_state: Option<Res<crate::rune_words::battle::BattleState>>,
     pending_grading: Option<Res<crate::rune_words::battle::PendingRowGrading>>,
     acting_data: Option<Res<crate::rune_words::battle_states::acting::ActingData>>,
-    reacting_data: Option<Res<crate::rune_words::battle_states::reacting::ReactingData>>,
 ) {
     let typed_letters: Vec<char> = typed_futhark_input.read().map(|event| event.0).collect();
 
@@ -449,7 +437,6 @@ pub fn update_active_rune_slot_from_typed_input(
         battle_state.as_deref(),
         pending_grading.as_deref(),
         acting_data.as_deref(),
-        reacting_data.as_deref(),
     );
 
     if behavior == TypedInputPolicy::Ignore {

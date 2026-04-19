@@ -31,31 +31,10 @@ pub struct ActingData {
     pub grading_against_letters: Option<String>,
 }
 
-#[derive(Component)]
-pub struct ActingCountLabel;
-
-#[derive(Component)]
-pub struct ActingBookPanel;
-
-#[derive(Component)]
-pub struct ActingBookEntry {
-    pub letters: String,
-}
-
-#[derive(Component)]
-pub struct ActingBookEntryBackground {
-    pub base_color: Color,
-}
-
 pub fn configure_acting(app: &mut App) {
     app.init_resource::<ActingData>();
     app.add_message::<StartActing>();
     app.add_message::<ActingSucceeded>();
-    app.add_systems(Update, cleanup_acting_book_outside_phase);
-    app.add_systems(
-        Update,
-        animate_acting_book_grading_highlight.run_if(is_acting),
-    );
     app.add_systems(
         Update,
         (start_acting, score_acting_row_on_enter.run_if(is_acting)).chain(),
@@ -77,7 +56,6 @@ fn start_acting(
     mut start_events: MessageReader<StartActing>,
     game_assets: Option<Res<GameAssets>>,
     existing_rows: Query<Entity, With<BattleRuneSlot>>,
-    existing_book: Query<Entity, With<ActingBookPanel>>,
     mut battle_state: ResMut<BattleState>,
     mut acting_data: ResMut<ActingData>,
     mut active_slot: ResMut<ActiveRuneSlot>,
@@ -91,10 +69,6 @@ fn start_acting(
     };
     if targets.is_empty() {
         return;
-    }
-
-    for panel in existing_book.iter() {
-        commands.entity(panel).despawn();
     }
 
     let max_rune_count = targets
@@ -130,151 +104,9 @@ fn start_acting(
         )
     };
 
-    spawn_acting_book_panel(&mut commands, &acting_data.targets);
-
     battle_state.next_row_id += 1;
     battle_state.active_row_slots = row.clone();
     active_slot.entity = row.first().copied();
-}
-
-fn spawn_acting_book_panel(commands: &mut Commands, targets: &[dictionary::Futharkation]) {
-    let entries = first_four_book_entries(targets);
-    let entry_base_color = Color::srgba(0.14, 0.2, 0.36, 0.92);
-
-    commands
-        .spawn((
-            ActingBookPanel,
-            Node {
-                position_type: PositionType::Absolute,
-                right: Val::Px(24.0),
-                bottom: Val::Px(24.0),
-                width: Val::Px(332.0),
-                padding: UiRect::all(Val::Px(10.0)),
-                flex_direction: FlexDirection::Column,
-                row_gap: Val::Px(8.0),
-                ..default()
-            },
-            BackgroundColor(Color::srgba(0.03, 0.03, 0.09, 0.75)),
-        ))
-        .with_children(|panel| {
-            panel.spawn((
-                Text::new("Book"),
-                TextFont {
-                    font_size: 20.0,
-                    ..default()
-                },
-                TextColor(Color::WHITE),
-            ));
-
-            for row in entries.chunks(2) {
-                panel
-                    .spawn(Node {
-                        width: Val::Percent(100.0),
-                        column_gap: Val::Px(8.0),
-                        ..default()
-                    })
-                    .with_children(|grid_row| {
-                        for entry in row {
-                            let label = match entry {
-                                Some(word) => word.word.clone(),
-                                None => "-".to_string(),
-                            };
-
-                            let mut node = grid_row.spawn((
-                                Node {
-                                    width: Val::Px(150.0),
-                                    min_height: Val::Px(56.0),
-                                    padding: UiRect::all(Val::Px(6.0)),
-                                    ..default()
-                                },
-                                BackgroundColor(entry_base_color),
-                                ActingBookEntryBackground {
-                                    base_color: entry_base_color,
-                                },
-                                children![(
-                                    Text::new(label),
-                                    TextFont {
-                                        font_size: 16.0,
-                                        ..default()
-                                    },
-                                    TextColor(Color::WHITE),
-                                )],
-                            ));
-
-                            if let Some(word) = entry {
-                                node.insert(ActingBookEntry {
-                                    letters: word.letters.clone(),
-                                });
-                            }
-                        }
-                    });
-            }
-        });
-}
-
-fn animate_acting_book_grading_highlight(
-    time: Res<Time>,
-    pending_grading: Res<PendingRowGrading>,
-    speed: Option<Res<crate::futhark::FutharkKeyboardAnimationSpeed>>,
-    acting_data: Res<ActingData>,
-    mut entries: Query<
-        (
-            &mut BackgroundColor,
-            &ActingBookEntryBackground,
-            Option<&ActingBookEntry>,
-        ),
-        With<ActingBookEntryBackground>,
-    >,
-) {
-    let hue_speed = speed
-        .as_ref()
-        .map(|s| s.hue_degrees_per_second)
-        .unwrap_or(30.0);
-    let rune_color = Color::hsl((time.elapsed_secs() * hue_speed) % 360.0, 1.0, 0.5);
-
-    for (mut bg, base, entry) in &mut entries {
-        let is_target = pending_grading.is_active()
-            && acting_data
-                .grading_against_letters
-                .as_deref()
-                .is_some_and(|letters| {
-                    entry
-                        .map(|book_entry| book_entry.letters.as_str() == letters)
-                        .unwrap_or(false)
-                });
-
-        bg.0 = if is_target {
-            rune_color
-        } else {
-            base.base_color
-        };
-    }
-}
-
-fn cleanup_acting_book_outside_phase(
-    mut commands: Commands,
-    battle_state: Res<BattleState>,
-    acting_book: Query<Entity, With<ActingBookPanel>>,
-) {
-    if matches!(battle_state.phase, BattlePhase::Acting) {
-        return;
-    }
-
-    for panel in acting_book.iter() {
-        commands.entity(panel).despawn();
-    }
-}
-
-fn first_four_book_entries(
-    targets: &[dictionary::Futharkation],
-) -> [Option<dictionary::Futharkation>; 4] {
-    let mut entries: [Option<dictionary::Futharkation>; 4] = [None, None, None, None];
-
-    for (index, target) in targets.iter().take(4).cloned().enumerate() {
-        entries[index] = Some(target);
-    }
-
-    entries
 }
 
 fn score_acting_row_on_enter(
@@ -529,12 +361,6 @@ mod tests {
             word: word.to_string(),
             letters: letters.to_string(),
         }
-    }
-
-    fn acting_book_panel_count(app: &mut App) -> usize {
-        let world = app.world_mut();
-        let mut query = world.query_filtered::<Entity, With<ActingBookPanel>>();
-        query.iter(world).count()
     }
 
     // --- unit tests for find_best_match ---
@@ -804,55 +630,4 @@ mod tests {
         assert!(row.into_iter().all(|letter| letter.is_none()));
     }
 
-    #[test]
-    fn first_four_book_entries_limits_and_pads() {
-        let entries = first_four_book_entries(&[
-            futha("w1", "fut"),
-            futha("w2", "ark"),
-            futha("w3", "gwn"),
-            futha("w4", "ijp"),
-            futha("w5", "zst"),
-        ]);
-
-        assert_eq!(entries[0].as_ref().map(|w| w.word.as_str()), Some("w1"));
-        assert_eq!(entries[1].as_ref().map(|w| w.word.as_str()), Some("w2"));
-        assert_eq!(entries[2].as_ref().map(|w| w.word.as_str()), Some("w3"));
-        assert_eq!(entries[3].as_ref().map(|w| w.word.as_str()), Some("w4"));
-
-        let padded = first_four_book_entries(&[futha("single", "fut")]);
-        assert_eq!(padded[0].as_ref().map(|w| w.word.as_str()), Some("single"));
-        assert!(padded[1].is_none());
-        assert!(padded[2].is_none());
-        assert!(padded[3].is_none());
-    }
-
-    #[test]
-    fn start_acting_spawns_book_panel() {
-        let mut app = make_test_app();
-        app.world_mut().write_message(StartActing {
-            targets: vec![
-                futha("a", "fut"),
-                futha("b", "ark"),
-                futha("c", "gwn"),
-                futha("d", "ijp"),
-            ],
-        });
-        app.update();
-
-        assert_eq!(acting_book_panel_count(&mut app), 1);
-    }
-
-    #[test]
-    fn acting_book_panel_cleans_up_when_phase_changes() {
-        let mut app = make_test_app();
-        app.world_mut().write_message(StartActing {
-            targets: vec![futha("a", "fut")],
-        });
-        app.update();
-
-        app.world_mut().resource_mut::<BattleState>().phase = BattlePhase::Idle;
-        app.update();
-
-        assert_eq!(acting_book_panel_count(&mut app), 0);
-    }
 }
