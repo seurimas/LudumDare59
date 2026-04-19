@@ -135,8 +135,20 @@ approximate it with the clear color + optional fullscreen `ImageNode` vignette
 ### 1.4 Grain and vignette overlay
 
 Spawn a fullscreen `Node` (100% × 100%, `PositionType::Absolute`, high
-`ZIndex`) with `ImageNode` showing `vignette.png` at ~40% alpha using
-`BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.4))`.
+`ZIndex`) with an `ImageNode` showing `vignette.png` at ~40% alpha.
+To tint the image's alpha, set the `color` field on `ImageNode` directly —
+**not** `BackgroundColor`, which only draws behind the image:
+
+```rust
+ImageNode {
+    image: game_assets.vignette.clone(),
+    color: Color::srgba(1.0, 1.0, 1.0, 0.4),
+    ..default()
+}
+```
+
+`BackgroundColor` on a node that also has `ImageNode` draws the background
+colour in the area behind/around the image, not as a tint over it.
 
 ---
 
@@ -150,7 +162,11 @@ Spawn a fullscreen `Node` (100% × 100%, `PositionType::Absolute`, high
 Three-column grid inside the bar: `[1fr, auto, 1fr]`, align-items center.
 
 Background: `BackgroundColor(Color::srgba(0.07, 0.04, 0.02, 0.85))` plus
-a `BorderColor(GOLD_DARK)` + `border: UiRect::all(Val::Px(1.0))`.
+a `BorderColor { top: GOLD_DARK, right: GOLD_DARK, bottom: GOLD_DARK, left: GOLD_DARK }`
++ `border: UiRect::all(Val::Px(1.0))`.
+(`BorderColor` is a named-field struct in Bevy 0.18; there is no tuple-struct
+constructor. All four sides must be set explicitly, or use `..default()` to
+fill the rest with black.)
 
 ### 2.2 Player combatant block (`CombatantBlock { side: Player }`)
 
@@ -163,7 +179,7 @@ Left side, row direction:
 
 ### 2.3 Enemy combatant block (`CombatantBlock { side: Enemy }`)
 
-Mirror of §2.2: flex `flex_direction: Row::Reverse`. HP fill anchors from the
+Mirror of §2.2: flex `flex_direction: FlexDirection::RowReverse`. HP fill anchors from the
 right — spawn the fill node with `position_type: Absolute, right: Val::Px(1.0)`
 and drive its `width`.
 
@@ -283,8 +299,13 @@ Node (grid: [auto 1fr], gap):
 ```
 
 `AttemptRow` component holds `row_id`, resolved word (if any), and tile states.  
-The oldest visible row gets `opacity: 0.55` via `BackgroundColor` alpha on
-the whole row node.
+The oldest visible row gets `opacity: 0.55` applied — **Bevy UI has no
+inherited opacity**. Setting `BackgroundColor` alpha to 0.55 only dims the row
+background rectangle, not child text or images. To fade the whole row, a sync
+system must set `TextColor` alpha to 0.55 on every text child and
+`ImageNode.color.set_alpha(0.55)` on every image child of the oldest
+`AttemptRow` entity. A helper that walks the row's children recursively is the
+cleanest approach.
 
 The existing `RowLetterGraded` message already carries `RuneMatchState` per
 letter — route this to populate the `AttemptRow` entries.
@@ -356,11 +377,19 @@ No change to logic. In legend mode the rune sprites are replaced by letter
 
 ### 5.1 Background
 
-`ImageNode` for `backdrop.png`, `ImageScaleMode::Stretched` (or `Cover`
-equivalent — fill the cell while preserving pixel art sharpness via
-`ImageSamplerDescriptor::nearest`).
+`ImageNode` for `backdrop.png` with `image_mode: NodeImageMode::Stretch`
+(resizes to fill the cell, ignoring intrinsic size — the correct equivalent of
+CSS `background-size: cover` for a square backdrop). Preserve pixel art
+sharpness by processing the asset after loading to set its sampler:
+`ImageSamplerDescriptor::nearest`. The simplest way to do this in Bevy 0.18
+is a one-shot startup system that calls
+`images.get_mut(&game_assets.backdrop).unwrap().sampler = ImageSampler::nearest()`
+after `GameState::Ready` is entered, before the first render.
 
-Border: `BorderColor(GOLD)`, 1px.
+Border: `BorderColor { top: GOLD, right: GOLD, bottom: GOLD, left: GOLD }`, 1px.
+(`BorderColor` in Bevy 0.18 is a named-field struct, not a tuple struct.
+Per-side colors are supported: e.g. `BorderColor { left: BLOOD, ..default() }`
+for the active spell left-border in §6.3.)
 
 ### 5.2 Corner brackets
 
@@ -434,7 +463,8 @@ Dark leather panel frame (§8.1) containing:
 ```
 Node (flex: 1, flex-col, overflow: clip):
   BackgroundColor: layered parchment gradient approximation:
-    Use ImageNode with parchment_tile.png (ImageScaleMode::Tiled)
+    Use ImageNode with parchment_tile.png and
+    image_mode: NodeImageMode::Tiled { tile_x: true, tile_y: true, stretch_value: 1.0 }
     or flat BackgroundColor(PARCHMENT_WARM) as fallback.
   border: 1px rgba(80,55,25,0.4) (inner leather border)
   box-shadow equivalent: inset border via nested Node or BorderColor
@@ -516,9 +546,15 @@ Spawn the grid row 3 node with:
 A function `spawn_leather_panel(commands, grid_column, grid_row) -> Entity`
 that spawns a `Node` with:
 - `BackgroundColor`: `Color::srgba(0.07, 0.05, 0.02, 0.90)`.
-- `BorderColor(GOLD_DARK)`, `border: UiRect::all(Val::Px(1.0))`.
-- `box_shadow`-equivalent: Bevy 0.18 supports `BoxShadow` component — use it
-  for the inset top gold sheen and drop shadow.
+- `BorderColor { top: GOLD_DARK, right: GOLD_DARK, bottom: GOLD_DARK, left: GOLD_DARK }`,
+  `border: UiRect::all(Val::Px(1.0))`.
+- **`BoxShadow` does NOT exist in Bevy 0.18.1.** Drop shadows / inset glows
+  cannot be achieved with a built-in component. Workarounds:
+  - Skip shadows entirely in MVP (flat border is legible).
+  - Fake a drop shadow by spawning a slightly-larger duplicate node
+    behind the panel at a small offset with a dark semi-transparent
+    `BackgroundColor`.
+  - Wait for a future Bevy version that adds box-shadow support.
 - 4 corner diamond pips (§5.2 pattern, but smaller) via 4 absolute child nodes.
 - Returns the entity so callers can add children.
 
@@ -660,3 +696,100 @@ pub sigils_layout: Handle<TextureAtlasLayout>,
 | 2-page book spread             | Deferred per open question in MOCKUP_REDESIGN.md                                                   |
 | Spell sigil unicode coverage   | OS font coverage uncertain; use sigil PNG atlas (§0.1) for safety                                  |
 | Portrait cameo sprites         | Placeholder glyphs until portrait atlas exists                                                     |
+
+---
+
+## 13. Bevy 0.18 API — Verified Correctness Notes
+
+This section records the results of checking all API claims in this document
+against Bevy 0.18.1 source (`bevy_ui-0.18.1`). Items marked ✅ are confirmed
+correct; ⚠️ marks a Bevy limitation to work around; ❌ marks something that
+was wrong in an earlier draft of this plan (already corrected above).
+
+### Layout / Node
+
+| Claim                                                   | Status | Notes                                      |
+| ------------------------------------------------------- | ------ | ------------------------------------------ |
+| `Val::Vw` / `Val::Vh`                                   | ✅      | Exist in 0.18                              |
+| `Node.aspect_ratio: Option<f32>`                        | ✅      | Confirmed in `ui_node.rs`                  |
+| `Display::Grid`                                         | ✅      | Supported                                  |
+| `grid_template_columns: Vec<RepeatedGridTrack>`         | ✅      | Confirmed field name                       |
+| `RepeatedGridTrack::fr(count: u16, value: f32)`         | ✅      | Confirmed                                  |
+| `grid_column: GridPlacement` / `GridPlacement::span(n)` | ✅      | Confirmed                                  |
+| `Overflow::clip()`                                      | ✅      | Confirmed via `OverflowAxis::Clip` backing |
+| `BorderRadius` component                                | ✅      | Exists, separate from `Node`               |
+| `UiRect` for per-side border widths                     | ✅      | `Node.border: UiRect`                      |
+
+### BorderColor
+
+| Claim                                                               | Status | Notes                                                                                                                       |
+| ------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `BorderColor` is a **named-field** struct                           | ✅      | `{ top, right, bottom, left: Color }` — per-side colors fully supported                                                     |
+| `BorderColor(single_color)` tuple syntax                            | ❌      | **Does not compile.** Use `BorderColor { top: X, right: X, bottom: X, left: X }`; also confirmed broken by repo memory note |
+| Left-only active border: `BorderColor { left: BLOOD, ..default() }` | ✅      | Per-side colors mean this works cleanly                                                                                     |
+
+### FlexDirection
+
+| Claim                                            | Status | Notes                              |
+| ------------------------------------------------ | ------ | ---------------------------------- |
+| `FlexDirection::RowReverse`                      | ✅      | Confirmed enum variant             |
+| `FlexDirection::Row::Reverse` (old plan wording) | ❌      | Not valid Rust — corrected in §2.3 |
+
+### Images / ImageNode
+
+| Claim                                                    | Status | Notes                                                                   |
+| -------------------------------------------------------- | ------ | ----------------------------------------------------------------------- |
+| `ImageNode.color: Color` for alpha tinting               | ✅      | Confirmed field; multiply tint                                          |
+| `ImageNode.image_mode: NodeImageMode`                    | ✅      | Confirmed field                                                         |
+| `NodeImageMode::Auto`                                    | ✅      | Default; auto-sizes from texture                                        |
+| `NodeImageMode::Stretch`                                 | ✅      | Resizes to node size, ignores texture aspect ratio                      |
+| `NodeImageMode::Tiled { tile_x, tile_y, stretch_value }` | ✅      | All three fields required                                               |
+| `NodeImageMode::Sliced(TextureSlicer)`                   | ✅      | For 9-slice; use for HP bar end-caps                                    |
+| `ImageScaleMode::Stretched` / `ImageScaleMode::Tiled`    | ❌      | Type does not exist in 0.18 — corrected in §5.1 and §6.2                |
+| `BackgroundColor` as image tint                          | ❌      | Does not tint image pixels; only draws behind image — corrected in §1.4 |
+
+### BoxShadow / TextShadow
+
+| Claim                             | Status | Notes                                                                                                                                                               |
+| --------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BoxShadow` component on UI nodes | ❌      | **Not present in bevy_ui-0.18.1.** Entire bevy_ui src searched; no matches. Workaround: spawn a slightly-larger dark sibling node behind the panel, or omit in MVP. |
+| `text-shadow` on `Text`           | ⚠️      | No built-in equivalent. Workaround: spawn a second text entity behind the first with shadow color and a small pixel offset.                                         |
+
+### Animations / Transform on UI nodes
+
+| Claim                                               | Status | Notes                                                                                                   |
+| --------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------- |
+| `Transform::translation.y` to bob NPC sprite        | ✅      | Respected for visual offset without affecting layout                                                    |
+| `Transform::scale.x` for shadow breathe             | ✅      | Visually scales rendering without reflowing layout (correct for absolute-positioned decorative nodes)   |
+| Mutating `Node.top: Val::Px(n)` to animate position | ✅      | Works but triggers layout recompute each frame; prefer `Transform::translation` for pure visual offsets |
+
+### Pixel-art sampler (NPC / backdrop)
+
+`ImageSamplerDescriptor::nearest` cannot be set via `bevy_asset_loader`
+`#[asset(...)]` attribute syntax in 0.26. Set it after loading in a
+one-shot system on `OnEnter(GameState::Ready)`:
+
+```rust
+fn set_nearest_samplers(
+    mut images: ResMut<Assets<Image>>,
+    game_assets: Res<GameAssets>,
+) {
+    for handle in [&game_assets.backdrop, &game_assets.goblin, &game_assets.robed] {
+        if let Some(img) = images.get_mut(handle) {
+            img.sampler = ImageSampler::nearest();
+        }
+    }
+}
+```
+
+### Dashed borders
+
+CSS `border-style: dashed` has **no equivalent** in Bevy 0.18 UI — all
+`Node` borders are solid. The Book of Acting spell separator and Binding
+TODO banner should use a faint solid `BorderColor` instead.
+
+### Inherited opacity
+
+Bevy 0.18 UI has **no cascading `opacity` property**. Alpha must be set
+individually on each `TextColor`, `BackgroundColor`, and `ImageNode.color`.
+See §3.3 for the ledger row fade workaround.
