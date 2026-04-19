@@ -9,7 +9,7 @@
         "decay": 0.55,
         "wet": 0.25
       },
-      "pitch_scale": 0.5
+      "pitch_scale": 1.2
     }
   ],
   [
@@ -22,7 +22,7 @@
         "decay": 0.6,
         "wet": 0.28
       },
-      "pitch_scale": 0.53
+      "pitch_scale": 1.2
     }
   ],
   [
@@ -35,7 +35,7 @@
         "decay": 0.5,
         "wet": 0.22
       },
-      "pitch_scale": 0.561
+      "pitch_scale": 1.2
     }
   ],
   [
@@ -48,7 +48,7 @@
         "decay": 0.65,
         "wet": 0.3
       },
-      "pitch_scale": 0.595
+      "pitch_scale": 1.2
     }
   ],
   [
@@ -61,7 +61,7 @@
         "decay": 0.55,
         "wet": 0.25
       },
-      "pitch_scale": 0.63
+      "pitch_scale": 1.2
     }
   ],
   [
@@ -74,7 +74,7 @@
         "decay": 0.6,
         "wet": 0.28
       },
-      "pitch_scale": 0.667
+      "pitch_scale": 1.2
     }
   ],
   [
@@ -87,7 +87,7 @@
         "decay": 0.52,
         "wet": 0.22
       },
-      "pitch_scale": 0.707
+      "pitch_scale": 1.2
     }
   ],
   [
@@ -100,7 +100,7 @@
         "decay": 0.68,
         "wet": 0.32
       },
-      "pitch_scale": 0.749
+      "pitch_scale": 1.2
     }
   ],
   [
@@ -113,7 +113,7 @@
         "decay": 0.58,
         "wet": 0.26
       },
-      "pitch_scale": 0.794
+      "pitch_scale": 1.2
     }
   ],
   [
@@ -126,7 +126,7 @@
         "decay": 0.48,
         "wet": 0.2
       },
-      "pitch_scale": 0.841
+      "pitch_scale": 1.2
     }
   ],
   [
@@ -139,7 +139,7 @@
         "decay": 0.62,
         "wet": 0.3
       },
-      "pitch_scale": 0.891
+      "pitch_scale": 1.2
     }
   ],
   [
@@ -152,7 +152,7 @@
         "decay": 0.55,
         "wet": 0.24
       },
-      "pitch_scale": 0.944
+      "pitch_scale": 1.2
     }
   ],
   [
@@ -165,7 +165,7 @@
         "decay": 0.6,
         "wet": 0.27
       },
-      "pitch_scale": 1.0
+      "pitch_scale": 1.2
     }
   ],
   [
@@ -178,7 +178,7 @@
         "decay": 0.5,
         "wet": 0.21
       },
-      "pitch_scale": 1.059
+      "pitch_scale": 1.2
     }
   ],
   [
@@ -191,7 +191,7 @@
         "decay": 0.7,
         "wet": 0.35
       },
-      "pitch_scale": 1.122
+      "pitch_scale": 1.2
     }
   ],
   [
@@ -204,7 +204,7 @@
         "decay": 0.53,
         "wet": 0.23
       },
-      "pitch_scale": 1.189
+      "pitch_scale": 1.2
     }
   ],
   [
@@ -217,7 +217,7 @@
         "decay": 0.63,
         "wet": 0.29
       },
-      "pitch_scale": 1.26
+      "pitch_scale": 1.2
     }
   ],
   [
@@ -230,7 +230,7 @@
         "decay": 0.57,
         "wet": 0.26
       },
-      "pitch_scale": 1.335
+      "pitch_scale": 1.2
     }
   ],
   [
@@ -243,7 +243,7 @@
         "decay": 0.56,
         "wet": 0.25
       },
-      "pitch_scale": 1.414
+      "pitch_scale": 1.2
     }
   ],
   [
@@ -256,7 +256,7 @@
         "decay": 0.64,
         "wet": 0.31
       },
-      "pitch_scale": 1.498
+      "pitch_scale": 1.2
     }
   ],
   [
@@ -269,7 +269,7 @@
         "decay": 0.51,
         "wet": 0.22
       },
-      "pitch_scale": 1.587
+      "pitch_scale": 1.2
     }
   ],
   [
@@ -282,7 +282,7 @@
         "decay": 0.59,
         "wet": 0.27
       },
-      "pitch_scale": 1.682
+      "pitch_scale": 1.2
     }
   ],
   [
@@ -295,7 +295,7 @@
         "decay": 0.54,
         "wet": 0.23
       },
-      "pitch_scale": 1.782
+      "pitch_scale": 1.2
     }
   ],
   [
@@ -308,7 +308,7 @@
         "decay": 0.72,
         "wet": 0.38
       },
-      "pitch_scale": 1.888
+      "pitch_scale": 1.2
     }
   ],
   [
@@ -321,7 +321,7 @@
         "decay": 0.72,
         "wet": 0.38
       },
-      "pitch_scale": 0.8
+      "pitch_scale": 1.2
     }
   ]
 ]
