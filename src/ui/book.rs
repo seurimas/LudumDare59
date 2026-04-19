@@ -4,6 +4,7 @@ use crate::GameAssets;
 use crate::GameState;
 use crate::futhark::{SPRITE_RUNE_OFFSET, letter_to_index};
 use crate::health::PlayerCombatState;
+use crate::spellbook::SpellEffect;
 use crate::ui::clock::BattleUiClock;
 use crate::ui::hud_root::BookPanel;
 use crate::ui::palette::*;
@@ -38,9 +39,9 @@ struct SpellEntryRuneRow {
     index: usize,
 }
 
-/// Sigil circle placeholder inside a SpellEntry.
+/// Effects icon row inside a SpellEntry.
 #[derive(Component)]
-struct SpellEntrySigil {
+struct SpellEntryEffectsRow {
     index: usize,
 }
 
@@ -198,7 +199,7 @@ pub fn spawn_book_panel(
 
                     // Page head rule
                     page.spawn((
-                        Text::new("⸺ grimoire · folio xxiv ⸺"),
+                        Text::new("⸺ spellbook ⸺"),
                         TextFont {
                             font: font_page.clone(),
                             font_size: 9.0,
@@ -236,7 +237,6 @@ pub fn spawn_book_panel(
                                         grid_template_columns: vec![
                                             RepeatedGridTrack::auto(1),
                                             RepeatedGridTrack::fr(1, 1.0),
-                                            RepeatedGridTrack::auto(1),
                                         ],
                                         column_gap: Val::Percent(3.0),
                                         align_items: AlignItems::Center,
@@ -298,46 +298,17 @@ pub fn spawn_book_panel(
                                                     ..default()
                                                 },
                                             ));
-                                        });
-
-                                    // ── Sigil ──
-                                    entry
-                                        .spawn((
-                                            SpellEntrySigil { index },
-                                            Node {
-                                                width: Val::Px(22.0),
-                                                height: Val::Px(22.0),
-                                                border: UiRect::all(Val::Px(1.5)),
-                                                border_radius: BorderRadius::all(Val::Percent(
-                                                    50.0,
-                                                )),
-                                                justify_content: JustifyContent::Center,
-                                                align_items: AlignItems::Center,
-                                                overflow: Overflow::clip(),
-                                                ..default()
-                                            },
-                                            BackgroundColor(PARCHMENT_SHADOW.with_alpha(0.3)),
-                                            BorderColor {
-                                                top: GOLD_DARK,
-                                                right: GOLD_DARK,
-                                                bottom: GOLD_DARK,
-                                                left: GOLD_DARK,
-                                            },
-                                        ))
-                                        .with_children(|sigil| {
-                                            sigil.spawn((
+                                            content.spawn((
+                                                SpellEntryEffectsRow { index },
                                                 Node {
-                                                    width: Val::Px(16.0),
-                                                    height: Val::Px(16.0),
+                                                    flex_direction: FlexDirection::Row,
+                                                    column_gap: Val::Px(4.0),
+                                                    margin: UiRect {
+                                                        top: Val::Px(2.0),
+                                                        ..default()
+                                                    },
                                                     ..default()
                                                 },
-                                                ImageNode::from_atlas_image(
-                                                    game_assets.sigils.clone(),
-                                                    TextureAtlas {
-                                                        layout: game_assets.sigils_layout.clone(),
-                                                        index,
-                                                    },
-                                                ),
                                             ));
                                         });
                                 });
@@ -356,6 +327,7 @@ fn sync_book_panel(
     mut dropcap_query: Query<(&SpellEntryDropcap, &mut Text, &mut TextColor)>,
     mut word_query: Query<(&SpellEntryWord, &mut Text, &mut TextColor), Without<SpellEntryDropcap>>,
     rune_row_query: Query<(Entity, &SpellEntryRuneRow)>,
+    effects_row_query: Query<(Entity, &SpellEntryEffectsRow)>,
     children_query: Query<&Children>,
 ) {
     if !player.is_changed() {
@@ -427,6 +399,65 @@ fn sync_book_panel(
             }
         });
     }
+
+    // Update effects rows: despawn old children, spawn icons + numbers.
+    let spells = first_four_spells(&player.hand);
+    for (effects_entity, effects_row) in &effects_row_query {
+        if let Ok(children) = children_query.get(effects_entity) {
+            for child in children.iter() {
+                commands.entity(child).despawn();
+            }
+        }
+
+        let Some(spell) = spells[effects_row.index].as_ref() else {
+            continue;
+        };
+
+        let font_num = game_assets.font_im_fell_sc.clone();
+        commands.entity(effects_entity).with_children(|row| {
+            for effect in &spell.effects {
+                let icon_index = effect_sprite_index(effect);
+                let labels = effect_labels(effect);
+
+                row.spawn(Node {
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::Center,
+                    row_gap: Val::Px(0.0),
+                    ..default()
+                })
+                .with_children(|col| {
+                    // Icon from futhark spritesheet
+                    col.spawn((
+                        Node {
+                            width: Val::Px(14.0),
+                            height: Val::Px(14.0),
+                            ..default()
+                        },
+                        ImageNode::from_atlas_image(
+                            game_assets.futhark.clone(),
+                            TextureAtlas {
+                                layout: game_assets.futhark_layout.clone(),
+                                index: icon_index,
+                            },
+                        ),
+                    ));
+
+                    // Number(s) below the icon
+                    for label in labels {
+                        col.spawn((
+                            Text::new(label),
+                            TextFont {
+                                font: font_num.clone(),
+                                font_size: 10.0,
+                                ..default()
+                            },
+                            TextColor(INK.with_alpha(0.7)),
+                        ));
+                    }
+                });
+            }
+        });
+    }
 }
 
 fn first_four_entries(
@@ -437,6 +468,40 @@ fn first_four_entries(
         entries[i] = Some(spell.as_futharkation());
     }
     entries
+}
+
+fn first_four_spells(
+    hand: &[crate::spellbook::SpellDef],
+) -> [Option<&crate::spellbook::SpellDef>; 4] {
+    let mut spells: [Option<&crate::spellbook::SpellDef>; 4] = [None, None, None, None];
+    for (i, spell) in hand.iter().take(4).enumerate() {
+        spells[i] = Some(spell);
+    }
+    spells
+}
+
+fn effect_sprite_index(effect: &SpellEffect) -> usize {
+    match effect {
+        SpellEffect::Damage { .. } => 250,
+        SpellEffect::Shield { .. } => 249,
+        SpellEffect::Stun { .. } => 248,
+        SpellEffect::Buff { .. } => 247,
+        SpellEffect::Binding { .. } => 246,
+    }
+}
+
+fn effect_labels(effect: &SpellEffect) -> Vec<String> {
+    match effect {
+        SpellEffect::Damage { amount } => vec![format!("{amount}")],
+        SpellEffect::Stun { amount } => vec![format!("{amount:.0}")],
+        SpellEffect::Shield { amount, duration } => {
+            vec![format!("{amount}"), format!("{duration:.0}s")]
+        }
+        SpellEffect::Buff { amount, duration } => {
+            vec![format!("{amount}"), format!("{duration:.0}s")]
+        }
+        SpellEffect::Binding { amount } => vec![format!("{amount}")],
+    }
 }
 
 // ─── Active pointer pulse ─────────────────────────────────────────────────────

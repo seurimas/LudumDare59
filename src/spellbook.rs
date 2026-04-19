@@ -12,6 +12,7 @@ pub enum SpellEffect {
     Stun { amount: f32 },
     Shield { amount: u32, duration: f32 },
     Buff { amount: i32, duration: f32 },
+    Binding { amount: u32 },
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -19,6 +20,8 @@ pub struct SpellDef {
     pub word: String,
     pub effects: Vec<SpellEffect>,
     pub futharkation: String,
+    #[serde(default)]
+    pub starter: bool,
 }
 
 impl SpellDef {
@@ -49,6 +52,8 @@ struct RawSpellDef {
     effects: Vec<SpellEffect>,
     #[serde(default, alias = "letters", alias = "futhark", alias = "futharkation")]
     futharkation_spec: Option<String>,
+    #[serde(default)]
+    starter: bool,
 }
 
 impl AssetLoader for BookLoader {
@@ -79,6 +84,7 @@ impl AssetLoader for BookLoader {
                 word: raw.word,
                 effects: raw.effects,
                 futharkation: mapped.letters,
+                starter: raw.starter,
             });
         }
 
@@ -123,6 +129,38 @@ impl From<serde_json::Error> for BookError {
 
 pub fn configure_book_asset(app: &mut App) {
     app.init_asset::<Book>().register_asset_loader(BookLoader);
+    app.init_resource::<LearnedSpells>();
+}
+
+/// Words the player has learned in the current run. Used to filter the book
+/// when the battle deck is assembled at the start of each combat.
+#[derive(Resource, Default, Debug, Clone)]
+pub struct LearnedSpells {
+    pub words: Vec<String>,
+}
+
+impl LearnedSpells {
+    pub fn contains(&self, word: &str) -> bool {
+        self.words.iter().any(|w| w == word)
+    }
+
+    pub fn insert(&mut self, word: String) {
+        if !self.contains(&word) {
+            self.words.push(word);
+        }
+    }
+
+    pub fn reset_to_starters(&mut self, spells: &[SpellDef]) {
+        self.words = spells
+            .iter()
+            .filter(|s| s.starter)
+            .map(|s| s.word.clone())
+            .collect();
+    }
+
+    pub fn filter_spells<'a>(&self, spells: &'a [SpellDef]) -> Vec<&'a SpellDef> {
+        spells.iter().filter(|s| self.contains(&s.word)).collect()
+    }
 }
 
 #[cfg(test)]
@@ -148,6 +186,7 @@ mod tests {
                     word: raw.word,
                     effects: raw.effects,
                     futharkation: mapped.letters,
+                    starter: raw.starter,
                 }
             })
             .collect();
@@ -181,6 +220,7 @@ mod tests {
                     word: raw.word,
                     effects: raw.effects,
                     futharkation: mapped.letters,
+                    starter: raw.starter,
                 }
             })
             .collect();
@@ -203,6 +243,53 @@ mod tests {
                 duration: 8.0
             },
         );
+    }
+
+    #[test]
+    fn deserializes_starter_flag_from_json() {
+        let bytes = include_bytes!("../assets/spellbook.book.json");
+        let raw: Vec<RawSpellDef> = serde_json::from_slice(bytes).expect("parses");
+        let starter_count = raw.iter().filter(|s| s.starter).count();
+        assert!(
+            starter_count >= 2,
+            "expected at least two starter spells, got {starter_count}"
+        );
+        let non_starter_count = raw.iter().filter(|s| !s.starter).count();
+        assert!(
+            non_starter_count >= 2,
+            "expected at least two non-starter spells, got {non_starter_count}"
+        );
+    }
+
+    #[test]
+    fn learned_spells_reset_to_starters_includes_only_starter_marked() {
+        let spells = vec![
+            SpellDef {
+                word: "keep".into(),
+                effects: Vec::new(),
+                futharkation: "kep".into(),
+                starter: true,
+            },
+            SpellDef {
+                word: "skip".into(),
+                effects: Vec::new(),
+                futharkation: "skip".into(),
+                starter: false,
+            },
+        ];
+        let mut learned = LearnedSpells::default();
+        learned.reset_to_starters(&spells);
+        assert!(learned.contains("keep"));
+        assert!(!learned.contains("skip"));
+
+        learned.insert("skip".into());
+        assert!(learned.contains("skip"));
+        let filtered: Vec<&str> = learned
+            .filter_spells(&spells)
+            .into_iter()
+            .map(|s| s.word.as_str())
+            .collect();
+        assert_eq!(filtered, vec!["keep", "skip"]);
     }
 
     #[test]

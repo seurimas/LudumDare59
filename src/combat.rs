@@ -12,9 +12,10 @@ use crate::npcs::NpcSpec;
 use crate::rune_words::battle::{BattlePhase, BattleState};
 use crate::rune_words::battle_states::acting::StartActing;
 use crate::rune_words::battle_states::binding::{BindingData, BindingSucceeded, StartBinding};
-use crate::spellbook::Book;
+use crate::spellbook::{Book, LearnedSpells};
 use crate::tutorial::TutorialState;
 use crate::ui::effects::EffectsQueue;
+use crate::ui::spell_selection::SpellSelection;
 
 const NPC_SPAWN_DELAY: f32 = 5.0;
 
@@ -37,6 +38,7 @@ pub fn configure_combat(app: &mut App) {
         remaining: NPC_SPAWN_DELAY,
         active: false,
     });
+    app.add_systems(OnEnter(GameState::Adventure), reset_learned_spells_to_starters);
     app.add_systems(
         Update,
         (
@@ -56,12 +58,31 @@ pub fn configure_combat(app: &mut App) {
     );
 }
 
+fn reset_learned_spells_to_starters(
+    mut learned: ResMut<LearnedSpells>,
+    game_assets: Option<Res<GameAssets>>,
+    books: Res<Assets<Book>>,
+    tutorial: Option<Res<TutorialState>>,
+) {
+    if tutorial.map_or(false, |t| t.active) {
+        return;
+    }
+    let Some(game_assets) = game_assets else {
+        return;
+    };
+    let Some(book) = books.get(&game_assets.spellbook) else {
+        return;
+    };
+    learned.reset_to_starters(book.spells());
+}
+
 fn reset_player_deck_on_battle_start(
     mut events: MessageReader<BattleStart>,
     mut player: ResMut<PlayerCombatState>,
     game_assets: Option<Res<GameAssets>>,
     books: Res<Assets<Book>>,
     tutorial: Option<Res<TutorialState>>,
+    learned: Res<LearnedSpells>,
 ) {
     if events.read().count() == 0 {
         return;
@@ -75,8 +96,13 @@ fn reset_player_deck_on_battle_start(
     let Some(book) = books.get(&game_assets.spellbook) else {
         return;
     };
+    let known: Vec<_> = learned
+        .filter_spells(book.spells())
+        .into_iter()
+        .cloned()
+        .collect();
     let mut rng = rand::thread_rng();
-    player.reset_for_new_combat(book.spells(), &mut rng);
+    player.reset_for_new_combat(&known, &mut rng);
 }
 
 fn tick_npc_attacks(
@@ -322,10 +348,16 @@ fn tick_npc_spawn_timer(
     tutorial: Option<Res<TutorialState>>,
     game_assets: Option<Res<GameAssets>>,
     npc_specs: Res<Assets<NpcSpec>>,
+    spell_selection: Res<SpellSelection>,
     mut battle_start: MessageWriter<BattleStart>,
     mut start_acting: MessageWriter<StartActing>,
 ) {
     if tutorial.as_ref().is_some_and(|t| t.active) {
+        return;
+    }
+
+    if spell_selection.is_open() {
+        spawn_timer.active = false;
         return;
     }
 

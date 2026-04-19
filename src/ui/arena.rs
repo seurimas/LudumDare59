@@ -302,6 +302,7 @@ fn sync_npc_sprite(
         combat_state.max = npc_spec.max_health;
         combat_state.hp = npc_spec.max_health;
         combat_state.attacks = npc_spec.attacks.clone();
+        combat_state.bindings = npc_spec.minimum_bindings;
 
         let sprite_index = npc_sprite_index(&combat_state, battle_state.phase);
         let mut image_node = npc_image(npc_type, &game_assets);

@@ -183,6 +183,21 @@ fn process_effect_queue(
                         24.0,
                     );
                 }
+                SpellEffect::Binding { amount } => {
+                    // Apply binding to NPC
+                    for mut npc in &mut npcs {
+                        npc.bindings += *amount;
+                    }
+                    // Spawn floating "BOUND" text
+                    spawn_floating_text(
+                        &mut commands,
+                        arena_entity,
+                        &format!("+{} BIND", amount),
+                        MANA_BRIGHT,
+                        font,
+                        18.0,
+                    );
+                }
                 SpellEffect::Stun { amount } => {
                     // Apply stun to NPC
                     for mut npc in &mut npcs {

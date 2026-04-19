@@ -189,6 +189,7 @@ fn set_player_hand_from_words(player: &mut PlayerCombatState, words: &[dictionar
             word: word.word.clone(),
             effects: Vec::new(),
             futharkation: word.letters.clone(),
+            starter: true,
         })
         .collect();
 }

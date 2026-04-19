@@ -397,6 +397,7 @@ mod tests {
                 word: target.word.clone(),
                 effects: Vec::new(),
                 futharkation: target.letters.clone(),
+                starter: true,
             })
             .collect();
     }
