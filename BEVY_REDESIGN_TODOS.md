@@ -23,10 +23,8 @@ dependency order. Check items off as they are completed.
       `bevy_asset_loader` `#[asset(...)]` fields (CormorantUnicase
       SemiBold/Bold, CormorantGaramond Italic variable, IM Fell DW Pica SC,
       UnifrakturMaguntia Regular)
-- [ ] Register image assets in `GameAssets` (parchment_tile, corner_bracket,
-      vignette, sigils + sigils_layout). **Blocked**: art PNGs do not yet exist
-      in `assets/images/`. Create the files first, then add `#[asset(...)]`
-      fields.
+- [x] Register image assets in `GameAssets` (parchment_tile, corner_bracket,
+      vignette, sigils + sigils_layout)
 - [x] Add a `set_nearest_samplers` startup system (runs
       `OnEnter(GameState::Ready)`) in `src/ui/samplers.rs` that sets
       `ImageSampler::nearest()` on backdrop, goblin, and robed handles

@@ -60,6 +60,16 @@ pub struct GameAssets {
     pub futhark_conversational_params: Handle<audio::FutharkSoundConfig>,
     #[asset(path = "images/backdrop.png")]
     pub backdrop: Handle<Image>,
+    #[asset(path = "images/parchment_tile.png")]
+    pub parchment_tile: Handle<Image>,
+    #[asset(path = "images/corner_bracket.png")]
+    pub corner_bracket: Handle<Image>,
+    #[asset(path = "images/vignette.png")]
+    pub vignette: Handle<Image>,
+    #[asset(path = "images/sigils.png")]
+    pub sigils: Handle<Image>,
+    #[asset(texture_atlas_layout(tile_size_x = 32, tile_size_y = 32, columns = 4, rows = 1))]
+    pub sigils_layout: Handle<TextureAtlasLayout>,
     #[asset(path = "images/goblin.png")]
     pub goblin: Handle<Image>,
     #[asset(texture_atlas_layout(tile_size_x = 64, tile_size_y = 64, columns = 2, rows = 2))]
