@@ -3,8 +3,8 @@ use bevy::prelude::*;
 use std::collections::HashSet;
 
 use crate::rune_words::battle::{
-    ACTIVE_ROW_TOP, BattlePhase, BattleRowMotion, BattleRuneSlot, BattleSet, BattleState, ROW_RISE,
-    RowResolved, RuneMatchState, collect_guess_submission, push_all_non_active_slots_up,
+    ACTIVE_ROW_TOP, BattlePhase, BattleRowMotion, BattleRuneSlot, BattleSet, BattleState, ROW_LEFT,
+    ROW_RISE, RowResolved, RuneMatchState, collect_guess_submission, push_all_non_active_slots_up,
     reset_battle_state, score_guess_submission, spawn_battle_row,
 };
 use crate::rune_words::rune_slots::{
@@ -31,16 +31,21 @@ pub struct ReactingData {
     pub elapsed: f32,
     pub active: bool,
     pub timer_display: Option<Entity>,
+    pub target_word_display: Option<Entity>,
 }
 
 #[derive(Component)]
 pub struct ReactingTimerDisplay;
+
+#[derive(Component)]
+pub struct ReactingTargetWordDisplay;
 
 pub fn configure_reacting(app: &mut App) {
     app.init_resource::<ReactingData>();
     app.add_message::<StartReacting>();
     app.add_message::<ReactingSucceeded>();
     app.add_message::<ReactingFailed>();
+    app.add_systems(Update, cleanup_reacting_overlays_outside_phase);
     app.add_systems(
         Update,
         (
@@ -82,10 +87,14 @@ fn start_reacting(
     if let Some(display) = reacting_data.timer_display.take() {
         commands.entity(display).despawn();
     }
+    if let Some(display) = reacting_data.target_word_display.take() {
+        commands.entity(display).despawn();
+    }
 
     reset_battle_state(&mut commands, &mut battle_state, existing_rows.iter());
     battle_state.phase = BattlePhase::Reacting;
 
+    let target_word = target.word.clone();
     let rune_count = target.letters.chars().count();
     reacting_data.target = Some(target);
     reacting_data.time_limit = time_limit;
@@ -114,13 +123,46 @@ fn start_reacting(
             TextColor(Color::WHITE),
             Node {
                 position_type: PositionType::Absolute,
-                left: Val::Px(crate::rune_words::battle::ROW_CENTER_LEFT - 20.0),
+                left: Val::Px(ROW_LEFT),
                 top: Val::Px(ACTIVE_ROW_TOP + 64.0),
                 ..default()
             },
         ))
         .id();
     reacting_data.timer_display = Some(timer_entity);
+
+    let target_word_entity = commands
+        .spawn((
+            ReactingTargetWordDisplay,
+            Text::new(target_word),
+            TextFont {
+                font_size: 64.0,
+                ..default()
+            },
+            TextColor(Color::WHITE),
+            Node {
+                position_type: PositionType::Absolute,
+                right: Val::Px(24.0),
+                bottom: Val::Px(24.0),
+                ..default()
+            },
+        ))
+        .id();
+    reacting_data.target_word_display = Some(target_word_entity);
+}
+
+fn cleanup_reacting_overlays_outside_phase(
+    mut commands: Commands,
+    battle_state: Res<BattleState>,
+    overlays: Query<Entity, Or<(With<ReactingTimerDisplay>, With<ReactingTargetWordDisplay>)>>,
+) {
+    if matches!(battle_state.phase, BattlePhase::Reacting) {
+        return;
+    }
+
+    for entity in overlays.iter() {
+        commands.entity(entity).despawn();
+    }
 }
 
 fn tick_reacting_timer(

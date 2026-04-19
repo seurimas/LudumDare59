@@ -35,7 +35,7 @@ pub const LETTERS: [char; 25] = [
     'S', // 24
 ];
 
-const KEYBOARD_ROW_OFFSETS: [f32; 3] = [-64.0, 32.0, 64.0];
+const KEYBOARD_ROW_OFFSETS: [f32; 3] = [0.0, 96.0, 128.0];
 // Each number shows up once, in a similar place to a QWERTY keyboard.
 const KEYBOARD_TOP_ROW: [usize; 10] = [12, 7, 18, 4, 16, 2, 1, 10, 23, 13];
 const KEYBOARD_MIDDLE_ROW: [usize; 9] = [3, 15, 22, 0, 6, 8, 11, 5, 20];
@@ -79,6 +79,9 @@ pub struct FutharkKeyRuneVisual;
 #[derive(Component)]
 pub struct FutharkKeyLetterVisual;
 
+#[derive(Component)]
+pub struct FutharkTabActionVisual;
+
 const SPRITE_KEYBOARD_BG: usize = 254;
 const SPRITE_TAB_ACTION: usize = 252;
 const SPRITE_BACKSPACE_ACTION: usize = 251;
@@ -99,7 +102,7 @@ pub struct FutharkKeyboardAnimationSpeed {
 impl Default for FutharkKeyboardAnimationSpeed {
     fn default() -> Self {
         Self {
-            hue_degrees_per_second: 60.0,
+            hue_degrees_per_second: 30.0,
         }
     }
 }
@@ -190,6 +193,16 @@ fn key_background_color(letter: char) -> Color {
         (true, false) => Color::srgb(0.96, 0.92, 0.50),
         (false, true) => Color::srgb(0.55, 0.72, 0.96),
         (false, false) => Color::WHITE,
+    }
+}
+
+fn keyboard_label_for_letter(letter: char) -> (String, f32) {
+    match letter {
+        'A' => ("ah".to_owned(), 16.0),
+        'S' => ("sh".to_owned(), 16.0),
+        'T' => ("th".to_owned(), 16.0),
+        'N' => ("ng".to_owned(), 16.0),
+        _ => (letter.to_string(), 24.0),
     }
 }
 
@@ -303,13 +316,12 @@ pub fn spawn_futhark_keyboard(mut commands: Commands, game_assets: Res<GameAsset
         .spawn((
             Node {
                 position_type: PositionType::Absolute,
-                left: Val::Percent(50.0),
+                left: Val::Px(24.0),
                 bottom: Val::Px(24.0),
                 flex_direction: FlexDirection::Column,
                 row_gap: Val::Px(10.0),
                 ..default()
             },
-            Transform::from_xyz(-260.0, 0.0, 0.0),
             FutharkKeyboard,
         ))
         .with_children(|parent| {
@@ -371,6 +383,7 @@ pub fn spawn_futhark_keyboard(mut commands: Commands, game_assets: Res<GameAsset
                                                 index: SPRITE_TAB_ACTION,
                                             },
                                         ),
+                                        FutharkTabActionVisual,
                                     ));
                                 });
                         }
@@ -586,16 +599,12 @@ pub fn animate_futhark_keyboard_colors(
     time: Res<Time>,
     speed: Res<FutharkKeyboardAnimationSpeed>,
     mut rune_images: Query<&mut ImageNode, With<FutharkKeyRuneVisual>>,
-    mut letter_colors: Query<&mut TextColor, With<FutharkKeyLetterVisual>>,
 ) {
     let hue = (time.elapsed_secs() * speed.hue_degrees_per_second) % 360.0;
     let color = Color::hsl(hue, 1.0, 0.5);
 
     for mut image in &mut rune_images {
         image.color = color;
-    }
-    for mut text_color in &mut letter_colors {
-        text_color.0 = color;
     }
 }
 
@@ -621,7 +630,7 @@ pub fn sync_futhark_keyboard_labels(
     mode: Res<FutharkKeyboardLegendMode>,
     mut runes: Query<&mut Node, (With<FutharkKeyRuneVisual>, Without<FutharkKeyLetterVisual>)>,
     mut letters: Query<
-        (&FutharkKeyLabel, &mut Text, &mut Node),
+        (&FutharkKeyLabel, &mut Text, &mut TextFont, &mut Node),
         (With<FutharkKeyLetterVisual>, Without<FutharkKeyRuneVisual>),
     >,
 ) {
@@ -638,9 +647,11 @@ pub fn sync_futhark_keyboard_labels(
         node.display = rune_display;
     }
 
-    for (label, mut text, mut node) in &mut letters {
+    for (label, mut text, mut text_font, mut node) in &mut letters {
         if let Some(letter) = index_to_letter(label.index) {
-            *text = Text::new(letter.to_string());
+            let (legend, font_size) = keyboard_label_for_letter(letter);
+            *text = Text::new(legend);
+            text_font.font_size = font_size;
         }
         node.display = letter_display;
     }
@@ -731,5 +742,14 @@ mod tests {
         assert_eq!(map_typed_char_to_futhark('a', &aliases), Some('a'));
         assert_eq!(map_typed_char_to_futhark('A', &aliases), Some('A'));
         assert_eq!(map_typed_char_to_futhark('z', &aliases), Some('z'));
+    }
+
+    #[test]
+    fn keyboard_labels_use_phonetics_for_uppercase_letters() {
+        assert_eq!(keyboard_label_for_letter('A'), ("ah".to_owned(), 16.0));
+        assert_eq!(keyboard_label_for_letter('S'), ("sh".to_owned(), 16.0));
+        assert_eq!(keyboard_label_for_letter('T'), ("th".to_owned(), 16.0));
+        assert_eq!(keyboard_label_for_letter('N'), ("ng".to_owned(), 16.0));
+        assert_eq!(keyboard_label_for_letter('r'), ("r".to_owned(), 24.0));
     }
 }

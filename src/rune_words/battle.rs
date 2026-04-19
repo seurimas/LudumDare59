@@ -5,9 +5,9 @@ use std::collections::{HashMap, HashSet};
 use super::rune_slots::{RuneSlot, RuneSlotConfig, RuneSlotForegroundSet, spawn_rune_word};
 use crate::{GameAssets, futhark};
 
-pub const ACTIVE_ROW_TOP: f32 = 220.0;
+pub const ACTIVE_ROW_TOP: f32 = 236.0;
 pub const ROW_RISE: f32 = 72.0;
-pub const ROW_CENTER_LEFT: f32 = 240.0;
+pub const ROW_LEFT: f32 = 36.0;
 pub const SLOT_SPACING: f32 = 68.0;
 pub const SLOT_SIZE: f32 = 48.0;
 pub const ROW_RISE_DURATION_SECONDS: f32 = 0.5;
@@ -158,7 +158,7 @@ pub fn spawn_battle_row(
     rune_count: usize,
     top: f32,
 ) -> Vec<Entity> {
-    let start_left = ROW_CENTER_LEFT - (rune_count.saturating_sub(1) as f32 * SLOT_SPACING * 0.5);
+    let start_left = ROW_LEFT;
     let configs = (0..rune_count)
         .map(|index| RuneSlotConfig {
             left: Val::Px(start_left + index as f32 * SLOT_SPACING),

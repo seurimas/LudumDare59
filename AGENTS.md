@@ -20,7 +20,7 @@ cargo run --bin uat_shows_loading_rune_reveal
 
 If the UAT exits with status 0, then that means I have approved the state of the UAT! Good job! If not, ask about what can be done to improve things.
 
-NEVER kill a UAT test. Expect that it may take some time to verify. I repeat, DO NOT KILL A TERMINAL RUNNING A UAT.
+NEVER kill a UAT test. Expect that it may take some time to verify. I repeat, DO NOT KILL A TERMINAL RUNNING A UAT.n
 
 ## Pre-work checklist
 
@@ -60,6 +60,31 @@ Then, report on the results to the user.
 - Keep asset loading in its own module: `src/loading.rs` with a `pub fn configure_loading(app: &mut App)` entry point.
 - Separate `configure_app` (global settings like `ClearColor`) from `configure_loading` (state machine + asset pipeline).
 - UAT-specific setup (e.g. spawning test sprites) must live inside the UAT binary, not in the game library. The library's `OnEnter(GameState::Ready)` should be left empty unless it is real game logic.
+
+## Screen layout and UI arrangement
+
+The battle UI anchors to four corners:
+
+### Keyboard (all phases)
+- Bottom-left corner
+- 3 rows of keys, left-aligned
+- Shows rune glyphs; toggles to letter aliases on Tab
+
+### Rune-word lane
+- Top-left corner
+- Active row; rises on resolve
+- Room for 3 failed rows stacked above
+
+### Acting phase
+- **Book panel**: Bottom-right corner, 2×2 grid of first 4 target words (text only, no rune spellings)
+- **Score label**: Left-aligned below active row (✓/~/✗ counts)
+
+### Reacting phase
+- **Target word display**: Bottom-right corner, large text, word only (no rune spelling)
+- **Timer display**: Top-left corner, counts down
+
+### Binding phase
+- Active row at top-left, no special overlays
 
 ## Commit messages
 
