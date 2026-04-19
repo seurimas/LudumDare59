@@ -130,29 +130,29 @@ dependency order. Check items off as they are completed.
 
 > New; no equivalent exists currently.
 
-- [ ] Spawn `CombatBar` (grid row 1, span 3) with three-column inner grid
+- [x] Spawn `CombatBar` (grid row 1, span 3) with three-column inner grid
       `[1fr, auto, 1fr]`
-- [ ] Spawn player `CombatantBlock` (left, flex-row):
-      - Portrait placeholder node (circular border, MANA dark background)
+- [x] Spawn player `CombatantBlock` (left, flex-row):
+      - No portraits
       - Combatant name text (Cormorant Unicase SemiBold, GOLD_LIGHT)
       - Player `HpBarNode` (see below)
-- [ ] Spawn enemy `CombatantBlock` (right, `FlexDirection::RowReverse`):
+- [x] Spawn enemy `CombatantBlock` (right, `FlexDirection::RowReverse`):
       - Same structure mirrored; HP fill anchors from the right
-- [ ] Spawn `HpBarNode` for each side:
+- [x] Spawn `HpBarNode` for each side:
       - Outer node: `Overflow::clip()`, 1px GOLD_DARK border
       - Fill node (absolute): width driven by the relevant health state
         (player fill reads `PlayerHealthState`; enemy fill reads the
         spawned NPC's `NpcHealthState`)
       - Tick overlay: 10 flex-row children with divider borders
       - HP text label (absolute, centered): IM Fell SC, PARCHMENT color
-- [ ] Spawn `PhaseBannerNode` (center column of combat bar):
+- [x] Spawn `PhaseBannerNode` (center column of combat bar):
       - "current phase" subtitle (IM Fell SC, PARCHMENT_DARK)
       - Phase name text (Cormorant Unicase Bold, GOLD_LIGHT)
         — reads "Combat" for the combat phase
       - 3 pip row (inactive/active driven by phase index)
-- [ ] Add `sync_hp_bars` system: reads `PlayerHealthState` and the active
+- [x] Add `sync_hp_bars` system: reads `PlayerHealthState` and the active
       NPC's `NpcHealthState`, updates fill node widths
-- [ ] Add `sync_phase_banner` system: reads `BattleState.phase`, updates
+- [x] Add `sync_phase_banner` system: reads `BattleState.phase`, updates
       text and pip colors
 
 ---
