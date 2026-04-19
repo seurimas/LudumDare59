@@ -86,6 +86,16 @@ The battle UI anchors to four corners:
 ### Binding phase
 - Active row at top-left, no special overlays
 
+### Combat area (all phases)
+- Top-right corner, 256×256 px
+- **Backdrop**: `images/backdrop.png` fills the area (ZIndex 0), always visible while in `GameState::Ready`
+- **NPC sprite**: centered at 64px offset from each edge, 128×128 px (ZIndex 1)
+  - Only spawned when `BattleState.npc_type` is `Some` and phase is non-Idle
+  - Despawned when `npc_type` is `None` or phase returns to `Idle`
+  - Sprite index by phase: Reacting = 1, Acting = 2, Binding = 3
+  - NPC variant: `NpcType::Goblin` → `images/goblin.png`; `NpcType::Robed` → `images/robed.png`
+  - Both spritesheets are 2×2 grids of 64×64 px tiles
+
 ## Commit messages
 
 Keep commit messages short (one line). Do not sign with a co-author tag or your name.
