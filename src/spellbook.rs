@@ -144,10 +144,31 @@ impl LearnedSpells {
         self.words.iter().any(|w| w == word)
     }
 
+    pub fn count(&self, word: &str) -> usize {
+        self.words.iter().filter(|w| *w == word).count()
+    }
+
     pub fn insert(&mut self, word: String) {
-        if !self.contains(&word) {
-            self.words.push(word);
+        self.words.push(word);
+    }
+
+    pub fn remove_one(&mut self, word: &str) -> bool {
+        if let Some(idx) = self.words.iter().position(|w| w == word) {
+            self.words.remove(idx);
+            true
+        } else {
+            false
         }
+    }
+
+    pub fn unique_words(&self) -> Vec<String> {
+        let mut seen: Vec<String> = Vec::new();
+        for w in &self.words {
+            if !seen.iter().any(|s| s == w) {
+                seen.push(w.clone());
+            }
+        }
+        seen
     }
 
     pub fn reset_to_starters(&mut self, spells: &[SpellDef]) {
@@ -159,7 +180,10 @@ impl LearnedSpells {
     }
 
     pub fn filter_spells<'a>(&self, spells: &'a [SpellDef]) -> Vec<&'a SpellDef> {
-        spells.iter().filter(|s| self.contains(&s.word)).collect()
+        self.words
+            .iter()
+            .filter_map(|word| spells.iter().find(|s| &s.word == word))
+            .collect()
     }
 }
 

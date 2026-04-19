@@ -9,9 +9,10 @@ use crate::RunStats;
 use crate::dictionary;
 use crate::health::{NpcAttack, NpcAttackState, NpcCombatState, PlayerCombatState};
 use crate::npcs::NpcSpec;
-use crate::rune_words::battle::{BattlePhase, BattleState};
+use crate::rune_words::battle::{BattlePhase, BattleState, PendingRowGrading};
 use crate::rune_words::battle_states::acting::StartActing;
 use crate::rune_words::battle_states::binding::{BindingData, BindingSucceeded, StartBinding};
+use crate::rune_words::battle_states::{LastGradedWord, WordBook};
 use crate::spellbook::{Book, LearnedSpells};
 use crate::tutorial::TutorialState;
 use crate::ui::effects::EffectsQueue;
@@ -40,7 +41,7 @@ pub fn configure_combat(app: &mut App) {
     });
     app.add_systems(
         OnEnter(GameState::Adventure),
-        reset_learned_spells_to_starters,
+        (reset_adventure_state, reset_learned_spells_to_starters).chain(),
     );
     app.add_systems(
         Update,
@@ -59,6 +60,55 @@ pub fn configure_combat(app: &mut App) {
         )
             .run_if(in_state(GameState::Adventure)),
     );
+}
+
+/// Reset all game state to a clean slate when (re-)entering Adventure.
+fn reset_adventure_state(
+    mut commands: Commands,
+    mut player: ResMut<PlayerCombatState>,
+    mut battle_state: ResMut<BattleState>,
+    mut effects: ResMut<EffectsQueue>,
+    mut binding_data: ResMut<BindingData>,
+    mut spell_selection: ResMut<SpellSelection>,
+    mut spawn_timer: ResMut<NpcSpawnTimer>,
+    mut run_stats: ResMut<RunStats>,
+    mut pending_grading: ResMut<PendingRowGrading>,
+    mut last_graded: ResMut<LastGradedWord>,
+    mut word_book: ResMut<WordBook>,
+    npc_query: Query<Entity, With<NpcCombatState>>,
+) {
+    // Player: full health, no shields/buffs, empty deck
+    *player = PlayerCombatState::default();
+    player.hp = player.max;
+
+    // Battle: idle phase, no NPC
+    battle_state.phase = BattlePhase::Idle;
+    battle_state.npc = None;
+    battle_state.active_row_slots.clear();
+    battle_state.pending_resolved_row = None;
+    battle_state.pending_settle_frames = 0;
+    battle_state.next_row_id = 0;
+    battle_state.resolved_rows = 0;
+
+    // Clear effects, binding, and spell selection
+    *effects = EffectsQueue::default();
+    *binding_data = BindingData::default();
+    *pending_grading = PendingRowGrading::default();
+    *last_graded = LastGradedWord::default();
+    *word_book = WordBook::default();
+    spell_selection.close();
+
+    // Reset NPC spawn timer
+    spawn_timer.remaining = NPC_SPAWN_DELAY;
+    spawn_timer.active = false;
+
+    // Reset run stats
+    run_stats.enemies_defeated = 0;
+
+    // Despawn any leftover NPC entities
+    for entity in &npc_query {
+        commands.entity(entity).despawn();
+    }
 }
 
 fn reset_learned_spells_to_starters(

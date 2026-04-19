@@ -11,11 +11,28 @@ use crate::spellbook::{Book, LearnedSpells, SpellDef, SpellEffect};
 use crate::tutorial::TutorialState;
 use crate::ui::palette::*;
 
+const UNLEARN_THRESHOLD: usize = 8;
+const RELEARN_THRESHOLD: usize = 12;
+
+/// The action a candidate card represents when clicked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SelectionMode {
+    Learn,
+    Unlearn,
+    Relearn,
+}
+
+#[derive(Debug, Clone)]
+pub struct Candidate {
+    pub word: String,
+    pub mode: SelectionMode,
+}
+
 /// Tracks the current spell-selection modal state. `candidates` is `Some` while
 /// the modal is open and pauses the NPC spawn timer.
 #[derive(Resource, Default)]
 pub struct SpellSelection {
-    pub candidates: Option<Vec<String>>,
+    pub candidates: Option<Vec<Candidate>>,
 }
 
 impl SpellSelection {
@@ -34,7 +51,11 @@ struct SpellSelectionModal;
 #[derive(Component)]
 struct SpellSelectionChoice {
     word: String,
+    mode: SelectionMode,
 }
+
+#[derive(Component)]
+struct SpellSelectionSkip;
 
 pub fn configure_spell_selection(app: &mut App) {
     app.init_resource::<SpellSelection>();
@@ -51,9 +72,9 @@ pub fn configure_spell_selection(app: &mut App) {
     );
 }
 
-/// When a binding succeeds outside the tutorial, pick up to two un-learned
-/// spells and open the selection modal. Does nothing if nothing remains to
-/// learn.
+/// When a binding succeeds outside the tutorial, build a set of candidates
+/// (up to 2 un-learned Learn options, plus Unlearn/Relearn once thresholds
+/// are reached) and open the selection modal.
 fn open_selection_on_binding_success(
     mut events: MessageReader<BindingSucceeded>,
     tutorial: Option<Res<TutorialState>>,
@@ -78,22 +99,51 @@ fn open_selection_on_binding_success(
         return;
     };
 
+    let mut rng = rand::thread_rng();
+    let mut candidates: Vec<Candidate> = Vec::new();
+
     let unlearned: Vec<String> = book
         .spells()
         .iter()
         .filter(|s| !learned.contains(&s.word))
         .map(|s| s.word.clone())
         .collect();
+    let mut learn_pool = unlearned;
+    learn_pool.shuffle(&mut rng);
+    learn_pool.truncate(2);
+    for word in learn_pool {
+        candidates.push(Candidate {
+            word,
+            mode: SelectionMode::Learn,
+        });
+    }
 
-    if unlearned.is_empty() {
+    let unique_learned = learned.unique_words();
+    if learned.words.len() >= UNLEARN_THRESHOLD
+        && let Some(word) = unique_learned.choose(&mut rng).cloned()
+    {
+        candidates.push(Candidate {
+            word,
+            mode: SelectionMode::Unlearn,
+        });
+    }
+    if learned.words.len() >= RELEARN_THRESHOLD
+        && let Some(word) = unique_learned.choose(&mut rng).cloned()
+    {
+        candidates.push(Candidate {
+            word,
+            mode: SelectionMode::Relearn,
+        });
+    }
+
+    let has_any_spell = candidates
+        .iter()
+        .any(|c| book.spells().iter().any(|s| s.word == c.word));
+    if !has_any_spell {
         return;
     }
 
-    let mut rng = rand::thread_rng();
-    let mut pool = unlearned;
-    pool.shuffle(&mut rng);
-    pool.truncate(2);
-    selection.candidates = Some(pool);
+    selection.candidates = Some(candidates);
 }
 
 fn spawn_selection_modal_when_open(
@@ -117,9 +167,14 @@ fn spawn_selection_modal_when_open(
         return;
     };
 
-    let spells: Vec<&SpellDef> = candidates
+    let resolved: Vec<(Candidate, &SpellDef)> = candidates
         .iter()
-        .filter_map(|word| book.spells().iter().find(|s| &s.word == word))
+        .filter_map(|c| {
+            book.spells()
+                .iter()
+                .find(|s| s.word == c.word)
+                .map(|s| (c.clone(), s))
+        })
         .collect();
 
     let font_heading = game_assets.font_cormorant_unicase_semibold.clone();
@@ -150,7 +205,7 @@ fn spawn_selection_modal_when_open(
                         row_gap: Val::Px(16.0),
                         padding: UiRect::all(Val::Px(24.0)),
                         border: UiRect::all(Val::Px(2.0)),
-                        max_width: Val::Px(720.0),
+                        max_width: Val::Px(960.0),
                         ..default()
                     },
                     BackgroundColor(Color::srgba(0.07, 0.05, 0.02, 0.96)),
@@ -188,10 +243,11 @@ fn spawn_selection_modal_when_open(
                             ..default()
                         })
                         .with_children(|row| {
-                            for spell in &spells {
+                            for (candidate, spell) in &resolved {
                                 spawn_choice_card(
                                     row,
                                     spell,
+                                    candidate.mode,
                                     &game_assets,
                                     font_heading.clone(),
                                     font_word.clone(),
@@ -199,6 +255,36 @@ fn spawn_selection_modal_when_open(
                                     font_aside.clone(),
                                 );
                             }
+                        });
+
+                    panel
+                        .spawn((
+                            Button,
+                            SpellSelectionSkip,
+                            Node {
+                                margin: UiRect::top(Val::Px(8.0)),
+                                padding: UiRect::axes(Val::Px(24.0), Val::Px(10.0)),
+                                border: UiRect::all(Val::Px(1.0)),
+                                ..default()
+                            },
+                            BackgroundColor(Color::srgba(0.12, 0.10, 0.06, 0.9)),
+                            BorderColor {
+                                top: GOLD_DARK,
+                                right: GOLD_DARK,
+                                bottom: GOLD_DARK,
+                                left: GOLD_DARK,
+                            },
+                        ))
+                        .with_children(|btn| {
+                            btn.spawn((
+                                Text::new("Skip"),
+                                TextFont {
+                                    font: font_aside.clone(),
+                                    font_size: 16.0,
+                                    ..default()
+                                },
+                                TextColor(PARCHMENT_WARM),
+                            ));
                         });
                 });
             });
@@ -208,22 +294,36 @@ fn spawn_selection_modal_when_open(
 fn spawn_choice_card(
     parent: &mut ChildSpawnerCommands,
     spell: &SpellDef,
+    mode: SelectionMode,
     game_assets: &GameAssets,
     font_heading: Handle<Font>,
     font_word: Handle<Font>,
     font_dropcap: Handle<Font>,
     font_num: Handle<Font>,
 ) {
-    let _ = font_heading;
+    let (mode_label, mode_color, card_bg) = match mode {
+        SelectionMode::Learn => ("Learn", GOLD_LIGHT, PARCHMENT_WARM),
+        SelectionMode::Unlearn => ("Unlearn", BLOOD, Color::srgba(0.28, 0.10, 0.08, 0.95)),
+        SelectionMode::Relearn => (
+            "Relearn (+1)",
+            GOLD_LIGHT,
+            Color::srgba(0.10, 0.14, 0.22, 0.95),
+        ),
+    };
+    let (heading_color, body_color) = match mode {
+        SelectionMode::Learn => (INK, INK),
+        _ => (PARCHMENT_WARM, PARCHMENT_WARM),
+    };
     parent
         .spawn((
             Button,
             SpellSelectionChoice {
                 word: spell.word.clone(),
+                mode,
             },
             Node {
-                width: Val::Px(260.0),
-                min_height: Val::Px(200.0),
+                width: Val::Px(240.0),
+                min_height: Val::Px(220.0),
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
                 row_gap: Val::Px(8.0),
@@ -231,7 +331,7 @@ fn spawn_choice_card(
                 border: UiRect::all(Val::Px(1.0)),
                 ..default()
             },
-            BackgroundColor(PARCHMENT_WARM),
+            BackgroundColor(card_bg),
             BorderColor {
                 top: GOLD_DARK,
                 right: GOLD_DARK,
@@ -240,6 +340,16 @@ fn spawn_choice_card(
             },
         ))
         .with_children(|card| {
+            card.spawn((
+                Text::new(mode_label),
+                TextFont {
+                    font: font_heading.clone(),
+                    font_size: 16.0,
+                    ..default()
+                },
+                TextColor(mode_color),
+            ));
+
             // Dropcap (first letter, uppercase)
             let first_char = spell
                 .word
@@ -265,7 +375,7 @@ fn spawn_choice_card(
                     font_size: 20.0,
                     ..default()
                 },
-                TextColor(INK),
+                TextColor(heading_color),
             ));
 
             // Rune glyph row
@@ -335,7 +445,7 @@ fn spawn_choice_card(
                                     font_size: 12.0,
                                     ..default()
                                 },
-                                TextColor(INK.with_alpha(0.8)),
+                                TextColor(body_color.with_alpha(0.85)),
                             ));
                         }
                     });
@@ -345,16 +455,27 @@ fn spawn_choice_card(
 }
 
 fn handle_selection_click(
-    interactions: Query<
-        (&Interaction, &SpellSelectionChoice),
-        (Changed<Interaction>, With<Button>),
-    >,
+    choices: Query<(&Interaction, &SpellSelectionChoice), (Changed<Interaction>, With<Button>)>,
+    skip: Query<&Interaction, (Changed<Interaction>, With<Button>, With<SpellSelectionSkip>)>,
     mut learned: ResMut<LearnedSpells>,
     mut selection: ResMut<SpellSelection>,
 ) {
-    for (interaction, choice) in &interactions {
+    for (interaction, choice) in &choices {
         if *interaction == Interaction::Pressed {
-            learned.insert(choice.word.clone());
+            match choice.mode {
+                SelectionMode::Learn | SelectionMode::Relearn => {
+                    learned.insert(choice.word.clone());
+                }
+                SelectionMode::Unlearn => {
+                    learned.remove_one(&choice.word);
+                }
+            }
+            selection.close();
+            return;
+        }
+    }
+    for interaction in &skip {
+        if *interaction == Interaction::Pressed {
             selection.close();
             return;
         }

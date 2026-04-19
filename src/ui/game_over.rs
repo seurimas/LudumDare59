@@ -105,14 +105,9 @@ fn despawn_game_over(mut commands: Commands, roots: Query<Entity, With<GameOverR
 fn handle_restart_button(
     interactions: Query<&Interaction, (Changed<Interaction>, With<RestartButton>)>,
     mut next_state: ResMut<NextState<GameState>>,
-    mut run_stats: ResMut<RunStats>,
-    mut player: ResMut<crate::health::PlayerCombatState>,
 ) {
     for interaction in &interactions {
         if *interaction == Interaction::Pressed {
-            // Reset everything for a fresh run
-            run_stats.enemies_defeated = 0;
-            *player = crate::health::PlayerCombatState::default();
             next_state.set(GameState::MainMenu);
         }
     }
