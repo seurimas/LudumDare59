@@ -106,23 +106,23 @@ dependency order. Check items off as they are completed.
 
 > Replaces the current 256×256 absolute top-right `CombatScene`.
 
-- [ ] Create `src/ui/arena.rs` with `pub fn configure_arena(app)`
-- [ ] Spawn `ArenaPanel` in grid row 2 col 2:
+- [x] Create `src/ui/arena.rs` with `pub fn configure_arena(app)`
+- [x] Spawn `ArenaPanel` in grid row 2 col 2:
       - `ImageNode` backdrop (`NodeImageMode::Stretch`, nearest sampler)
       - `BorderColor` all sides GOLD, 1px
-- [ ] Spawn 4 `CornerBracket` child nodes (absolute, GOLD bars + diamond pip)
+- [x] Spawn 4 `CornerBracket` child nodes (absolute, GOLD bars + diamond pip)
       — use bracket PNG if asset exists, otherwise two-bar Node approach
-- [ ] Spawn `PhaseMark` pill (absolute, top-left of arena):
+- [x] Spawn `PhaseMark` pill (absolute, top-left of arena):
       - Pulsing dot driven by `BattleUiClock`
       - Text updated by `sync_phase_mark` system reading `BattleState.phase`
       - **Phase name should read "Combat" not "Acting"**
-- [ ] Move NPC sprite logic from `src/combat.rs` into `ArenaPanel`:
+- [x] Move NPC sprite logic from `src/combat.rs` into `ArenaPanel`:
       - Center sprite with percent-based sizing (~22% of arena)
       - Bob animation driven by `BattleUiClock`
       - Ground shadow ellipse with breathe animation
-- [ ] Remove old `CombatScene` / `spawn_combat_scene` absolute layout from
+- [x] Remove old `CombatScene` / `spawn_combat_scene` absolute layout from
       `src/combat.rs` once `ArenaPanel` is live
-- [ ] Run `uat_battle_stages` — confirm zero exit
+- [x] Run `uat_battle_stages` — confirm zero exit
 
 ---
 
