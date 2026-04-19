@@ -198,10 +198,28 @@ fn npc_sprite_index(npc: &NpcCombatState, phase: BattlePhase) -> usize {
         return 0;
     }
     match npc.attack_state {
-        NpcAttackState::WaitingFor(_) => 1,
-        NpcAttackState::AttackingIn(_) => 2,
+        NpcAttackState::WaitingFor(_) => 2,
+        NpcAttackState::AttackingIn(_) => 1,
         _ => 0,
     }
+}
+
+const FLICKER_INVISIBLE_SECONDS: f32 = 1.0 / 15.0;
+
+fn npc_sprite_visible(npc: &NpcCombatState) -> bool {
+    let NpcAttackState::AttackingIn(remaining) = npc.attack_state else {
+        return true;
+    };
+    let Some(attack) = npc.chosen_attack else {
+        return true;
+    };
+    if attack.flicker_rate <= 0.0 {
+        return true;
+    }
+    let elapsed = (attack.attack_time - remaining).max(0.0);
+    let period = 1.0 / attack.flicker_rate;
+    let phase = elapsed.rem_euclid(period);
+    phase >= FLICKER_INVISIBLE_SECONDS
 }
 
 fn npc_image(npc_type: NpcType, game_assets: &GameAssets) -> ImageNode {
@@ -308,6 +326,12 @@ fn sync_npc_sprite(
             if let Some(atlas) = &mut image_node.texture_atlas {
                 atlas.index = sprite_index;
             }
+            let alpha = if npc_sprite_visible(combat_state) {
+                1.0
+            } else {
+                0.0
+            };
+            image_node.color = image_node.color.with_alpha(alpha);
         }
     }
 }
