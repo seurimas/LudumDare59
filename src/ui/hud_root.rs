@@ -68,8 +68,10 @@ pub fn spawn_battle_hud_root(mut commands: Commands, hud: Res<Hud>) {
                     Node {
                         grid_column: GridPlacement::start(1),
                         grid_row: GridPlacement::start(2),
+                        min_height: Val::Px(0.0),
                         flex_direction: FlexDirection::Column,
                         row_gap: Val::Percent(1.0),
+                        overflow: Overflow::clip(),
                         ..default()
                     },
                 ))
@@ -79,6 +81,7 @@ pub fn spawn_battle_hud_root(mut commands: Commands, hud: Res<Hud>) {
                         Node {
                             flex_grow: 1.0,
                             flex_basis: Val::Percent(0.0),
+                            min_height: Val::Px(0.0),
                             flex_direction: FlexDirection::Column,
                             row_gap: Val::Percent(1.5),
                             padding: UiRect::all(Val::Percent(1.5)),

@@ -15,7 +15,7 @@ pub struct ActiveAttemptCard;
 #[derive(Component)]
 pub struct RuneSlotRow;
 
-/// Scrollable ledger of completed attempt rows (up to 4 visible).
+/// Scrollable ledger of completed attempt rows.
 #[derive(Component)]
 pub struct LedgerList;
 
@@ -193,7 +193,8 @@ pub fn spawn_inscribed_ui(
                 flex_direction: FlexDirection::Column,
                 flex_grow: 1.0,
                 flex_basis: Val::Px(0.0),
-                row_gap: Val::Percent(2.0),
+                min_height: Val::Px(0.0),
+                row_gap: Val::Px(2.0),
                 overflow: Overflow::clip(),
                 ..default()
             },
@@ -220,7 +221,7 @@ fn populate_ledger_on_row_resolved(
     mut pending: ResMut<PendingLedgerData>,
     last_word: Res<crate::rune_words::battle_states::LastGradedWord>,
     ledger_query: Query<Entity, With<LedgerList>>,
-    existing_rows: Query<Entity, With<AttemptRow>>,
+    existing_rows: Query<(Entity, &AttemptRow)>,
     game_assets: Option<Res<crate::GameAssets>>,
 ) {
     let row_ids: Vec<u32> = resolved.read().map(|r| r.0).collect();
@@ -241,11 +242,12 @@ fn populate_ledger_on_row_resolved(
         let tiles = pending.rows.remove(&row_id).unwrap_or_default();
         let word = last_word.word.clone();
 
-        // Evict oldest row when ledger is at capacity
-        let existing: Vec<Entity> = existing_rows.iter().collect();
-        if existing.len() >= 4 {
-            if let Some(&oldest) = existing.first() {
-                commands.entity(oldest).despawn();
+        // Cap the number of retained rows to bound memory use.
+        let existing: Vec<(Entity, u32)> =
+            existing_rows.iter().map(|(entity, row)| (entity, row.row_id)).collect();
+        if existing.len() >= 20 {
+            if let Some((oldest_entity, _)) = existing.into_iter().min_by_key(|(_, id)| *id) {
+                commands.entity(oldest_entity).despawn();
             }
         }
 
@@ -269,7 +271,9 @@ fn populate_ledger_on_row_resolved(
                 Node {
                     flex_direction: FlexDirection::Row,
                     align_items: AlignItems::FlexStart,
+                    flex_shrink: 0.0,
                     column_gap: Val::Percent(3.0),
+                    overflow: Overflow::clip(),
                     ..default()
                 },
             ))
@@ -289,7 +293,9 @@ fn populate_ledger_on_row_resolved(
                 row.spawn(Node {
                     flex_direction: FlexDirection::Column,
                     flex_grow: 1.0,
+                    min_width: Val::Px(0.0),
                     row_gap: Val::Percent(1.0),
+                    overflow: Overflow::clip(),
                     ..default()
                 })
                 .with_children(|col| {
@@ -298,6 +304,7 @@ fn populate_ledger_on_row_resolved(
                         flex_direction: FlexDirection::Row,
                         flex_wrap: FlexWrap::Wrap,
                         column_gap: Val::Px(2.0),
+                        overflow: Overflow::clip(),
                         ..default()
                     })
                     .with_children(|tiles_row| {
@@ -341,7 +348,7 @@ fn populate_ledger_on_row_resolved(
 
     // Fade oldest row if ledger has more than one entry.
     // Bevy has no inherited opacity, so we walk descendants and set alpha to 0.55.
-    let current_rows: Vec<Entity> = existing_rows.iter().collect();
+    let current_rows: Vec<Entity> = existing_rows.iter().map(|(entity, _)| entity).collect();
     if current_rows.len() > 1 {
         if let Some(&oldest) = current_rows.first() {
             // Fade marker is handled by a separate system if needed — stub only

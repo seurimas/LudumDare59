@@ -216,7 +216,8 @@ pub fn spawn_book_panel(
                         flex_direction: FlexDirection::Column,
                         flex_grow: 1.0,
                         flex_basis: Val::Percent(0.0),
-                        justify_content: JustifyContent::SpaceBetween,
+                        min_height: Val::Px(0.0),
+                        overflow: Overflow::clip(),
                         ..default()
                     })
                     .with_children(|spells| {
@@ -225,6 +226,9 @@ pub fn spawn_book_panel(
                                 .spawn((
                                     SpellEntry { index },
                                     Node {
+                                        height: Val::Percent(25.0),
+                                        min_height: Val::Px(0.0),
+                                        overflow: Overflow::clip(),
                                         display: Display::Grid,
                                         grid_template_columns: vec![
                                             RepeatedGridTrack::auto(1),
