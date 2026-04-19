@@ -30,6 +30,12 @@ pub enum BattlePhase {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NpcType {
+    Goblin,
+    Robed,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RuneMatchState {
     Missing,
     Present,
@@ -49,6 +55,7 @@ impl RuneMatchState {
 #[derive(Resource, Default)]
 pub struct BattleState {
     pub phase: BattlePhase,
+    pub npc_type: Option<NpcType>,
     pub active_row_slots: Vec<Entity>,
     pub pending_resolved_row: Option<u32>,
     pub pending_settle_frames: u8,

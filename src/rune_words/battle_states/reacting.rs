@@ -320,6 +320,11 @@ mod tests {
             futhark_sounds: Vec::new(),
             futhark_sound_params: Handle::default(),
             futhark_conversational_params: Handle::default(),
+            backdrop: Handle::default(),
+            goblin: Handle::default(),
+            goblin_layout: Handle::default(),
+            robed: Handle::default(),
+            robed_layout: Handle::default(),
         });
         app
     }

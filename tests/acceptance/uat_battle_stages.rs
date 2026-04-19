@@ -1,11 +1,13 @@
 use LudumDare59::{
     GameState, acceptance, configure_app, configure_loading, dictionary,
     futhark::{FutharkKeyboardAnimationSpeed, spawn_futhark_keyboard},
-    rune_words::battle::configure_battle,
-    rune_words::battle_states::{
-        acting::{ActingSucceeded, StartActing},
-        binding::{BindingSucceeded, StartBinding},
-        reacting::{ReactingFailed, ReactingSucceeded, StartReacting},
+    rune_words::{
+        battle::{BattleState, NpcType, configure_battle},
+        battle_states::{
+            acting::{ActingSucceeded, StartActing},
+            binding::{BindingSucceeded, StartBinding},
+            reacting::{ReactingFailed, ReactingSucceeded, StartReacting},
+        },
     },
 };
 use bevy::ecs::message::{MessageReader, MessageWriter};
@@ -74,7 +76,9 @@ fn setup_demo(
     mut start_acting: MessageWriter<StartActing>,
     mut speed: ResMut<FutharkKeyboardAnimationSpeed>,
     mut book: ResMut<WordBook>,
+    mut battle_state: ResMut<BattleState>,
 ) {
+    battle_state.npc_type = Some(NpcType::Goblin);
     let mut rng = rand::thread_rng();
 
     let words: Vec<dictionary::Futharkation> = [3usize, 4, 5, 3, 4]

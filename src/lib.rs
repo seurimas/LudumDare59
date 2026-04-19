@@ -3,6 +3,7 @@ use bevy_asset_loader::prelude::*;
 
 pub mod acceptance;
 pub mod audio;
+pub mod combat;
 pub mod dictionary;
 pub mod futhark;
 pub mod loading;
@@ -55,12 +56,23 @@ pub struct GameAssets {
     pub futhark_sound_params: Handle<audio::FutharkSoundConfig>,
     #[asset(path = "sound/conversational_params.json")]
     pub futhark_conversational_params: Handle<audio::FutharkSoundConfig>,
+    #[asset(path = "images/backdrop.png")]
+    pub backdrop: Handle<Image>,
+    #[asset(path = "images/goblin.png")]
+    pub goblin: Handle<Image>,
+    #[asset(texture_atlas_layout(tile_size_x = 64, tile_size_y = 64, columns = 2, rows = 2))]
+    pub goblin_layout: Handle<TextureAtlasLayout>,
+    #[asset(path = "images/robed.png")]
+    pub robed: Handle<Image>,
+    #[asset(texture_atlas_layout(tile_size_x = 64, tile_size_y = 64, columns = 2, rows = 2))]
+    pub robed_layout: Handle<TextureAtlasLayout>,
 }
 
 pub fn configure_app(app: &mut App) {
     app.insert_resource(ClearColor(Color::linear_rgb(0.0, 0.0, 1.0)));
     futhark::configure_futhark_keyboard(app);
     rune_words::rune_slots::configure_rune_slots(app);
+    combat::configure_combat(app);
 
     app.add_systems(
         Update,
