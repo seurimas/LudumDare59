@@ -7,6 +7,7 @@ default-run = "LudumDare59"
 [dependencies]
 bevy = { version = "0.18.1", features = ["debug"] }
 bevy_asset_loader = { version = "0.26", features = ["2d"] }
+bevy_aspect_ratio_mask = "0.4"
 rand = "0.8"
 rodio = "0.20"
 pitch_shift = "2"

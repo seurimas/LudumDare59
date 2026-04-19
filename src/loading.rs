@@ -1,3 +1,4 @@
+use bevy::camera::ScalingMode;
 use bevy::prelude::*;
 use bevy_asset_loader::prelude::*;
 
@@ -68,7 +69,16 @@ pub fn configure_loading(app: &mut App) {
 }
 
 fn setup_camera(mut commands: Commands) {
-    commands.spawn(Camera2d);
+    commands.spawn((
+        Camera2d::default(),
+        Projection::from(OrthographicProjection {
+            scaling_mode: ScalingMode::AutoMin {
+                min_width: 1280.0,
+                min_height: 720.0,
+            },
+            ..OrthographicProjection::default_2d()
+        }),
+    ));
 }
 
 fn spawn_loading_screen(mut commands: Commands) {

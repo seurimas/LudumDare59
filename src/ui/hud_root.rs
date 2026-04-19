@@ -1,10 +1,8 @@
 use bevy::prelude::*;
+use bevy_aspect_ratio_mask::Hud;
 
 use crate::GameState;
 use crate::ui::palette::{GOLD_DARK, PARCHMENT_DARK};
-
-#[derive(Component)]
-pub struct BattleHudWrapper;
 
 #[derive(Component)]
 pub struct BattleHudRoot;
@@ -31,106 +29,93 @@ pub fn configure_hud_root(app: &mut App) {
     app.add_systems(OnEnter(GameState::Ready), spawn_battle_hud_root);
 }
 
-pub fn spawn_battle_hud_root(mut commands: Commands) {
-    commands
-        .spawn((
-            BattleHudWrapper,
-            Node {
-                position_type: PositionType::Absolute,
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                ..default()
-            },
-        ))
-        .with_children(|wrapper| {
-            wrapper
-                .spawn((
-                    BattleHudRoot,
+pub fn spawn_battle_hud_root(mut commands: Commands, hud: Res<Hud>) {
+    commands.entity(hud.0).with_children(|hud_root| {
+        hud_root
+            .spawn((
+                BattleHudRoot,
+                Node {
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(100.0),
+                    display: Display::Grid,
+                    grid_template_columns: vec![
+                        RepeatedGridTrack::fr(1, 22.0),
+                        RepeatedGridTrack::fr(1, 50.0),
+                        RepeatedGridTrack::fr(1, 22.0),
+                    ],
+                    grid_template_rows: vec![
+                        RepeatedGridTrack::fr(1, 10.0),
+                        RepeatedGridTrack::fr(1, 76.0),
+                        RepeatedGridTrack::fr(1, 14.0),
+                    ],
+                    column_gap: Val::Percent(1.0),
+                    row_gap: Val::Percent(1.0),
+                    padding: UiRect::all(Val::Percent(1.4)),
+                    ..default()
+                },
+            ))
+            .with_children(|grid| {
+                grid.spawn((
+                    CombatBar,
+                    placeholder_node(GridPlacement::span(3), GridPlacement::start(1)),
+                    placeholder_background(),
+                    placeholder_border_color(),
+                    children![placeholder_label("Combat Bar")],
+                ));
+
+                grid.spawn((
+                    LeftColumn,
                     Node {
-                        width: Val::Percent(100.0),
-                        height: Val::Percent(100.0),
-                        aspect_ratio: Some(16.0 / 9.0),
-                        display: Display::Grid,
-                        grid_template_columns: vec![
-                            RepeatedGridTrack::fr(1, 22.0),
-                            RepeatedGridTrack::fr(1, 50.0),
-                            RepeatedGridTrack::fr(1, 22.0),
-                        ],
-                        grid_template_rows: vec![
-                            RepeatedGridTrack::fr(1, 12.0),
-                            RepeatedGridTrack::fr(1, 74.0),
-                            RepeatedGridTrack::fr(1, 14.0),
-                        ],
-                        column_gap: Val::Percent(1.0),
+                        grid_column: GridPlacement::start(1),
+                        grid_row: GridPlacement::start(2),
+                        flex_direction: FlexDirection::Column,
                         row_gap: Val::Percent(1.0),
-                        padding: UiRect::all(Val::Percent(1.4)),
                         ..default()
                     },
                 ))
-                .with_children(|grid| {
-                    grid.spawn((
-                        CombatBar,
-                        placeholder_node(GridPlacement::span(3), GridPlacement::start(1)),
-                        placeholder_background(),
-                        placeholder_border_color(),
-                        children![placeholder_label("Combat Bar")],
-                    ));
-
-                    grid.spawn((
-                        LeftColumn,
+                .with_children(|left_column| {
+                    left_column.spawn((
+                        InscribedPanel,
                         Node {
-                            grid_column: GridPlacement::start(1),
-                            grid_row: GridPlacement::start(2),
+                            flex_grow: 1.0,
+                            flex_basis: Val::Percent(0.0),
                             flex_direction: FlexDirection::Column,
-                            row_gap: Val::Percent(1.0),
-                            ..default()
-                        },
-                    ))
-                    .with_children(|left_column| {
-                        left_column.spawn((
-                            InscribedPanel,
-                            Node {
-                                flex_grow: 1.0,
-                                flex_basis: Val::Percent(0.0),
-                                flex_direction: FlexDirection::Column,
-                                row_gap: Val::Percent(1.5),
-                                padding: UiRect::all(Val::Percent(1.5)),
-                                overflow: Overflow::clip(),
-                                ..default()
-                            },
-                        ));
-                    });
-
-                    grid.spawn((
-                        ArenaPanel,
-                        Node {
-                            grid_column: GridPlacement::start(2),
-                            grid_row: GridPlacement::start(2),
+                            row_gap: Val::Percent(1.5),
+                            padding: UiRect::all(Val::Percent(1.5)),
                             overflow: Overflow::clip(),
-                            border: UiRect::all(Val::Percent(0.1)),
                             ..default()
                         },
-                    ));
-
-                    grid.spawn((
-                        BookPanel,
-                        placeholder_node(GridPlacement::start(3), GridPlacement::start(2)),
-                        placeholder_background(),
-                        placeholder_border_color(),
-                        children![placeholder_label("Book Panel")],
-                    ));
-
-                    grid.spawn((
-                        BindingPanel,
-                        placeholder_node(GridPlacement::span(3), GridPlacement::start(3)),
-                        placeholder_background(),
-                        placeholder_border_color(),
-                        children![placeholder_label("Binding Panel")],
                     ));
                 });
-        });
+
+                grid.spawn((
+                    ArenaPanel,
+                    Node {
+                        grid_column: GridPlacement::start(2),
+                        grid_row: GridPlacement::start(2),
+                        overflow: Overflow::clip(),
+                        border: UiRect::all(Val::Percent(0.1)),
+                        ..default()
+                    },
+                ));
+
+                grid.spawn((
+                    BookPanel,
+                    placeholder_node(GridPlacement::start(3), GridPlacement::start(2)),
+                    placeholder_background(),
+                    placeholder_border_color(),
+                    children![placeholder_label("Book Panel")],
+                ));
+
+                grid.spawn((
+                    BindingPanel,
+                    placeholder_node(GridPlacement::span(3), GridPlacement::start(3)),
+                    placeholder_background(),
+                    placeholder_border_color(),
+                    children![placeholder_label("Binding Panel")],
+                ));
+            });
+    });
 }
 
 fn placeholder_node(column: GridPlacement, row: GridPlacement) -> Node {

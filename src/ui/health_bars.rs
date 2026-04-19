@@ -97,6 +97,7 @@ fn spawn_combat_bar(
             grid_column: GridPlacement::span(3),
             grid_row: GridPlacement::start(1),
             width: Val::Percent(100.0),
+            min_width: Val::Percent(0.0),
             display: Display::Grid,
             grid_template_columns: vec![
                 RepeatedGridTrack::fr(1, 1.0),
@@ -109,6 +110,7 @@ fn spawn_combat_bar(
             padding: UiRect::all(Val::Percent(1.0)),
             row_gap: Val::Percent(1.0),
             column_gap: Val::Percent(1.0),
+            overflow: Overflow::clip(),
             ..default()
         })
         .insert((
@@ -141,7 +143,7 @@ fn spawn_combat_bar(
                     block.spawn((
                         PortraitNode,
                         Node {
-                            width: Val::Percent(15.0),
+                            width: Val::Percent(12.0),
                             aspect_ratio: Some(1.0),
                             border: UiRect::all(Val::Percent(0.24)),
                             border_radius: BorderRadius::MAX,
@@ -159,8 +161,8 @@ fn spawn_combat_bar(
                     // Name and HP
                     block
                         .spawn((Node {
-                            width: Val::Percent(83.0),
                             min_width: Val::Percent(0.0),
+                            max_width: Val::Percent(84.0),
                             flex_direction: FlexDirection::Column,
                             flex_grow: 1.0,
                             flex_basis: Val::Percent(0.0),
@@ -184,7 +186,7 @@ fn spawn_combat_bar(
                                 Node {
                                     width: Val::Percent(100.0),
                                     min_width: Val::Percent(0.0),
-                                    aspect_ratio: Some(24.0),
+                                    aspect_ratio: Some(30.0),
                                     border: UiRect::all(Val::Percent(0.12)),
                                     overflow: Overflow::clip(),
                                     ..default()
@@ -364,7 +366,7 @@ fn spawn_combat_bar(
                     block.spawn((
                         PortraitNode,
                         Node {
-                            width: Val::Percent(15.0),
+                            width: Val::Percent(12.0),
                             aspect_ratio: Some(1.0),
                             border: UiRect::all(Val::Percent(0.24)),
                             border_radius: BorderRadius::MAX,
@@ -382,8 +384,8 @@ fn spawn_combat_bar(
                     // Name and HP (mirrored)
                     block
                         .spawn((Node {
-                            width: Val::Percent(83.0),
                             min_width: Val::Percent(0.0),
+                            max_width: Val::Percent(84.0),
                             flex_direction: FlexDirection::Column,
                             flex_grow: 1.0,
                             flex_basis: Val::Percent(0.0),
@@ -408,7 +410,7 @@ fn spawn_combat_bar(
                                 Node {
                                     width: Val::Percent(100.0),
                                     min_width: Val::Percent(0.0),
-                                    aspect_ratio: Some(24.0),
+                                    aspect_ratio: Some(30.0),
                                     border: UiRect::all(Val::Percent(0.12)),
                                     overflow: Overflow::clip(),
                                     ..default()

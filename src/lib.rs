@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy_aspect_ratio_mask::{AspectRatioPlugin, Resolution};
 use bevy_asset_loader::prelude::*;
 
 pub mod acceptance;
@@ -81,6 +82,13 @@ pub struct GameAssets {
 
 pub fn configure_app(app: &mut App) {
     app.insert_resource(ClearColor(ui::palette::NIGHT));
+    app.add_plugins(AspectRatioPlugin {
+        resolution: Resolution {
+            width: 1280.0,
+            height: 720.0,
+        },
+        ..default()
+    });
     futhark::configure_futhark_keyboard(app);
     rune_words::rune_slots::configure_rune_slots(app);
     ui::configure_ui(app);
