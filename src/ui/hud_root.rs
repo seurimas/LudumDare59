@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use bevy_aspect_ratio_mask::Hud;
 
 use crate::GameState;
+use crate::ui::keyboard::spawn_futhark_keyboard;
 use crate::ui::palette::GOLD_DARK;
 
 #[derive(Component)]
@@ -26,6 +27,10 @@ pub struct BookPanel;
 pub struct BindingPanel;
 
 pub fn configure_hud_root(app: &mut App) {
+    app.add_systems(
+        OnEnter(GameState::Adventure),
+        spawn_futhark_keyboard.after(spawn_battle_hud_root),
+    );
     app.add_systems(OnEnter(GameState::Adventure), spawn_battle_hud_root);
     app.add_systems(OnExit(GameState::Adventure), despawn_battle_hud_root);
 }
