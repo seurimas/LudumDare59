@@ -208,8 +208,16 @@ The chevron `clip_path` from CSS cannot be reproduced with a plain `Node`.
 **Recommended approach**: use the HP bar end-cap PNG (§0.1) as a 9-slice
 `ImageNode` overlay. If the asset isn't ready, use flat rectangle bars.
 
-New resource: `HpState { player_hp: u32, player_max: u32, enemy_hp: u32, enemy_max: u32 }`  
-System `sync_hp_bars` reads it and sets fill node widths each frame.
+Health state is split by ownership:
+- **`PlayerHealthState { hp: u32, max: u32 }`** — `Resource`. The player is a
+  singleton; a resource is the natural home for it.
+- **`NpcHealthState { hp: u32, max: u32 }`** — `Component` attached to the
+  spawned NPC entity in `combat.rs`. Attaching to the entity means HP is
+  created/despawned with the NPC automatically and scales to multi-NPC
+  encounters without a separate registry.
+
+System `sync_hp_bars` reads the player resource for the left fill and queries
+the active NPC entity for the right fill; it sets both node widths each frame.
 
 ### 2.5 Phase banner (`PhaseBannerNode`)
 
@@ -670,7 +678,7 @@ pub sigils_layout: Handle<TextureAtlasLayout>,
 1. **§0.3** — Add palette constants. Zero risk.
 2. **§9** — Add `BattleUiClock`. Zero risk; needed by everything animated.
 3. **§1.1–1.2** — Introduce `BattleHudRoot` grid. Spawn it on `OnEnter(GameState::Ready)` **alongside** existing panels (not replacing them yet). Verify grid layout in UAT.
-4. **§2** — Combat bar (HP bars with flat rectangles, phase banner). Stub HP with `HpState` holding fixed values for now.
+4. **§2** — Combat bar (HP bars with flat rectangles, phase banner). Stub HP with `PlayerHealthState` (resource) and `NpcHealthState` (component on the NPC entity) holding fixed values for now.
 5. **§5** — Migrate arena + NPC into the centre grid column. Remove old `CombatScene` absolute layout. **Run `uat_battle_stages` to verify.**
 6. **§4** — Wrap keyboard in `KeyboardPanel`. Migrate key spawn coordinates from absolute px to percent-relative. **Run `uat_shows_futhark_rune` and navigation UATs.**
 7. **§3** — Replace rune-word lane with `InscribedPanel` + `LedgerList`. Wire `RowLetterGraded` → tile colors. **Run `uat_shows_acting_battle_state`.**

@@ -75,6 +75,7 @@ pub fn configure_app(app: &mut App) {
     rune_words::rune_slots::configure_rune_slots(app);
     combat::configure_combat(app);
     ui::clock::configure_clock(app);
+    ui::health::configure_health(app);
 
     app.add_systems(
         Update,

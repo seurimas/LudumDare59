@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 use crate::rune_words::battle::{BattlePhase, BattleState, NpcType};
+use crate::ui::health::NpcHealthState;
 use crate::{GameAssets, GameState};
 
 const BACKDROP_SIZE: f32 = 256.0;
@@ -105,6 +106,7 @@ fn sync_npc_sprite(
         commands.entity(scene_entity).with_children(|parent| {
             parent.spawn((
                 NpcSprite,
+                NpcHealthState::default(),
                 Node {
                     position_type: PositionType::Absolute,
                     top: Val::Px(NPC_OFFSET),
