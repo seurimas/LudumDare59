@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::GameAssets;
 use crate::GameState;
 use crate::futhark::{SPRITE_RUNE_OFFSET, letter_to_index};
-use crate::rune_words::battle_states::acting::ActingData;
+use crate::health::PlayerCombatState;
 use crate::ui::clock::BattleUiClock;
 use crate::ui::hud_root::BookPanel;
 use crate::ui::palette::*;
@@ -344,14 +344,14 @@ pub fn spawn_book_panel(
 
 fn sync_book_panel(
     mut commands: Commands,
-    acting_data: Res<ActingData>,
+    player: Res<PlayerCombatState>,
     game_assets: Option<Res<GameAssets>>,
     mut dropcap_query: Query<(&SpellEntryDropcap, &mut Text, &mut TextColor)>,
     mut word_query: Query<(&SpellEntryWord, &mut Text, &mut TextColor), Without<SpellEntryDropcap>>,
     rune_row_query: Query<(Entity, &SpellEntryRuneRow)>,
     children_query: Query<&Children>,
 ) {
-    if !acting_data.is_changed() {
+    if !player.is_changed() {
         return;
     }
 
@@ -359,7 +359,7 @@ fn sync_book_panel(
         return;
     };
 
-    let entries = first_four_entries(&acting_data.targets);
+    let entries = first_four_entries(&player.hand);
 
     // Update dropcaps.
     for (dropcap, mut text, mut color) in &mut dropcap_query {
@@ -423,11 +423,11 @@ fn sync_book_panel(
 }
 
 fn first_four_entries(
-    targets: &[crate::dictionary::Futharkation],
+    hand: &[crate::spellbook::SpellDef],
 ) -> [Option<crate::dictionary::Futharkation>; 4] {
     let mut entries: [Option<crate::dictionary::Futharkation>; 4] = [None, None, None, None];
-    for (i, t) in targets.iter().take(4).cloned().enumerate() {
-        entries[i] = Some(t);
+    for (i, spell) in hand.iter().take(4).enumerate() {
+        entries[i] = Some(spell.as_futharkation());
     }
     entries
 }

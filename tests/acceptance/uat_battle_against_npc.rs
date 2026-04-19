@@ -9,6 +9,7 @@ use LudumDare59::{
         battle::{BattleState, NpcType, configure_battle},
         battle_states::acting::{ActingSucceeded, StartActing},
     },
+    spellbook::SpellDef,
     ui::{arena::NpcSprite, hud_root::spawn_battle_hud_root},
 };
 use bevy::ecs::message::{MessageReader, MessageWriter};
@@ -58,7 +59,6 @@ fn main() {
 #[derive(Resource, Default)]
 struct ActiveFight {
     npc_type: Option<NpcType>,
-    words: Vec<dictionary::Futharkation>,
     spec_applied: bool,
     max_health: Option<u32>,
     attack_count: usize,
@@ -142,6 +142,7 @@ fn pick_npc_on_function_keys(
     specs: Res<Assets<NpcSpec>>,
     mut battle_state: ResMut<BattleState>,
     mut fight: ResMut<ActiveFight>,
+    mut player: ResMut<PlayerCombatState>,
     mut start_acting: MessageWriter<StartActing>,
     mut battle_start: MessageWriter<BattleStart>,
 ) {
@@ -166,13 +167,13 @@ fn pick_npc_on_function_keys(
         .collect();
 
     fight.npc_type = Some(spec.npc_type);
-    fight.words = words.clone();
     fight.spec_applied = false;
     fight.max_health = Some(spec.max_health);
     fight.attack_count = spec.attacks.len();
 
     battle_start.write(BattleStart);
-    start_acting.write(StartActing { targets: words });
+    set_player_hand_from_words(&mut player, &words);
+    start_acting.write(StartActing);
 }
 
 fn apply_spec_to_spawned_npc(
@@ -195,18 +196,23 @@ fn apply_spec_to_spawned_npc(
 
 fn loop_acting_on_success(
     mut succeeded: MessageReader<ActingSucceeded>,
-    fight: Res<ActiveFight>,
     mut start_acting: MessageWriter<StartActing>,
 ) {
     if succeeded.read().last().is_none() {
         return;
     }
-    if fight.words.is_empty() {
-        return;
-    }
-    start_acting.write(StartActing {
-        targets: fight.words.clone(),
-    });
+    start_acting.write(StartActing);
+}
+
+fn set_player_hand_from_words(player: &mut PlayerCombatState, words: &[dictionary::Futharkation]) {
+    player.hand = words
+        .iter()
+        .map(|word| SpellDef {
+            word: word.word.clone(),
+            effects: Vec::new(),
+            futharkation: word.letters.clone(),
+        })
+        .collect();
 }
 
 fn update_status_label(fight: Res<ActiveFight>, mut labels: Query<&mut Text, With<StatusLabel>>) {

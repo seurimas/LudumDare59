@@ -1,6 +1,7 @@
 use LudumDare59::{
     GameState, acceptance, configure_app, configure_loading, dictionary,
     futhark::{FutharkKeyboardAnimationSpeed, spawn_futhark_keyboard},
+    health::PlayerCombatState,
     rune_words::{
         battle::{BattleState, NpcType, configure_battle},
         battle_states::{
@@ -8,6 +9,7 @@ use LudumDare59::{
             binding::{BindingSucceeded, StartBinding},
         },
     },
+    spellbook::SpellDef,
     ui::hud_root::spawn_battle_hud_root,
 };
 use bevy::ecs::message::{MessageReader, MessageWriter};
@@ -23,7 +25,6 @@ fn main() {
     configure_loading(&mut app);
     configure_battle(&mut app);
 
-    app.init_resource::<WordBook>();
     app.init_resource::<StageFlow>();
     app.add_message::<QuickTime>();
 
@@ -50,11 +51,6 @@ fn main() {
 }
 
 #[derive(Resource, Default)]
-struct WordBook {
-    words: Vec<dictionary::Futharkation>,
-}
-
-#[derive(Resource, Default)]
 struct StageFlow {
     binding_unlocked_by_quicktime: bool,
 }
@@ -71,8 +67,8 @@ struct DemoState {
 fn setup_demo(
     mut commands: Commands,
     mut start_acting: MessageWriter<StartActing>,
+    mut player: ResMut<PlayerCombatState>,
     mut speed: ResMut<FutharkKeyboardAnimationSpeed>,
-    mut book: ResMut<WordBook>,
     mut battle_state: ResMut<BattleState>,
 ) {
     battle_state.npc_type = Some(NpcType::Goblin);
@@ -84,7 +80,7 @@ fn setup_demo(
         .collect();
 
     speed.hue_degrees_per_second = 45.0;
-    book.words = words.clone();
+    set_player_hand_from_words(&mut player, &words);
 
     let book_label = words
         .iter()
@@ -97,7 +93,7 @@ fn setup_demo(
         quicktime_sent: false,
     });
 
-    start_acting.write(StartActing { targets: words });
+    start_acting.write(StartActing);
 
     commands.spawn((
         Node {
@@ -151,7 +147,6 @@ fn on_acting_succeeded(
     mut flow: ResMut<StageFlow>,
     mut start_binding: MessageWriter<StartBinding>,
     mut start_acting: MessageWriter<StartActing>,
-    book: Res<WordBook>,
 ) {
     let Some(_matched) = succeeded.read().last().map(|ev| ev.matched.clone()) else {
         return;
@@ -165,24 +160,26 @@ fn on_acting_succeeded(
         return;
     }
 
-    if !book.words.is_empty() {
-        start_acting.write(StartActing {
-            targets: book.words.clone(),
-        });
-    }
+    start_acting.write(StartActing);
 }
 
 fn on_binding_succeeded(
     mut succeeded: MessageReader<BindingSucceeded>,
     mut start_acting: MessageWriter<StartActing>,
-    book: Res<WordBook>,
 ) {
     if !succeeded.is_empty() {
         succeeded.clear();
-        if !book.words.is_empty() {
-            start_acting.write(StartActing {
-                targets: book.words.clone(),
-            });
-        }
+        start_acting.write(StartActing);
     }
+}
+
+fn set_player_hand_from_words(player: &mut PlayerCombatState, words: &[dictionary::Futharkation]) {
+    player.hand = words
+        .iter()
+        .map(|word| SpellDef {
+            word: word.word.clone(),
+            effects: Vec::new(),
+            futharkation: word.letters.clone(),
+        })
+        .collect();
 }

@@ -9,13 +9,12 @@ use crate::rune_words::battle::{
 };
 use crate::rune_words::battle_states::LastGradedWord;
 use crate::rune_words::rune_slots::{ActiveRuneSlot, EnterActiveRuneWord, RuneSlot};
+use crate::spellbook::SpellDef;
 use crate::ui::inscribed::RuneSlotRow;
 use crate::{GameAssets, dictionary};
 
 #[derive(bevy::ecs::message::Message, Clone, Debug)]
-pub struct StartActing {
-    pub targets: Vec<dictionary::Futharkation>,
-}
+pub struct StartActing;
 
 #[derive(bevy::ecs::message::Message, Clone, Debug)]
 pub struct ActingSucceeded {
@@ -25,11 +24,10 @@ pub struct ActingSucceeded {
 
 #[derive(Resource, Default)]
 pub struct ActingData {
-    pub targets: Vec<dictionary::Futharkation>,
     pub max_rune_count: usize,
     pub pending_success: bool,
     pub pending_matched: Option<dictionary::Futharkation>,
-    pub grading_against_letters: Option<String>,
+    pub grading_word: Option<String>,
 }
 
 pub fn configure_acting(app: &mut App) {
@@ -72,6 +70,7 @@ fn start_acting(
     mut commands: Commands,
     mut start_events: MessageReader<StartActing>,
     game_assets: Option<Res<GameAssets>>,
+    player: Option<Res<PlayerCombatState>>,
     existing_rows: Query<Entity, With<BattleRuneSlot>>,
     mut battle_state: ResMut<BattleState>,
     mut acting_data: ResMut<ActingData>,
@@ -81,9 +80,15 @@ fn start_acting(
     let Some(game_assets) = game_assets else {
         return;
     };
-    let Some(StartActing { targets }) = start_events.read().last().cloned() else {
+    if start_events.read().last().is_none() {
+        return;
+    }
+
+    let Some(player) = player else {
         return;
     };
+
+    let targets = targets_from_hand(&player.hand);
     if targets.is_empty() {
         return;
     }
@@ -97,11 +102,10 @@ fn start_acting(
     reset_battle_state(&mut commands, &mut battle_state, existing_rows.iter());
     battle_state.phase = BattlePhase::Acting;
 
-    acting_data.targets = targets;
     acting_data.max_rune_count = max_rune_count;
     acting_data.pending_success = false;
     acting_data.pending_matched = None;
-    acting_data.grading_against_letters = None;
+    acting_data.grading_word = None;
 
     let row = if let Some(container) = row_slot_container.iter().next() {
         spawn_battle_row_in_container(
@@ -132,6 +136,7 @@ fn score_acting_row_on_enter(
     mut active_slot: ResMut<ActiveRuneSlot>,
     mut acting_data: ResMut<ActingData>,
     mut pending_grading: ResMut<PendingRowGrading>,
+    player: Option<Res<PlayerCombatState>>,
     rune_slots: Query<&RuneSlot>,
     battle_slots: Query<&BattleRuneSlot>,
     prebaked_audio: Option<Res<crate::futhark::PrebakedFutharkConversationalAudio>>,
@@ -157,7 +162,12 @@ fn score_acting_row_on_enter(
     };
     let row_id = battle_slot.row_id;
 
-    let Some((best_target, best_results)) = find_best_match(&guess, &acting_data.targets) else {
+    let Some(player) = player else {
+        return;
+    };
+    let targets = targets_from_hand(&player.hand);
+
+    let Some((best_target, best_results)) = find_best_match(&guess, &targets) else {
         return;
     };
 
@@ -178,12 +188,10 @@ fn score_acting_row_on_enter(
         baked_samples.as_deref(),
     );
 
-    acting_data.grading_against_letters = Some(best_target.letters.clone());
+    acting_data.grading_word = Some(best_target.word.clone());
 
-    acting_data.pending_success = correct >= 2;
-    if acting_data.pending_success {
-        acting_data.pending_matched = Some(best_target);
-    }
+    acting_data.pending_success = correct == best_target.letters.chars().count();
+    acting_data.pending_matched = Some(best_target);
 
     battle_state.active_row_slots.clear();
 }
@@ -208,30 +216,17 @@ fn on_acting_row_resolved(
     }
 
     // Record the resolved word for the ledger.
-    last_graded_word.word = acting_data
-        .grading_against_letters
-        .as_deref()
-        .and_then(|letters| {
-            acting_data
-                .targets
-                .iter()
-                .find(|t| t.letters == letters)
-                .map(|t| t.word.clone())
-        });
-
-    acting_data.grading_against_letters = None;
+    last_graded_word.word = acting_data.grading_word.take();
 
     if acting_data.pending_success {
-        let matched = acting_data.pending_matched.take().unwrap_or_else(|| {
+        let matched =
             acting_data
-                .targets
-                .first()
-                .cloned()
+                .pending_matched
+                .take()
                 .unwrap_or_else(|| dictionary::Futharkation {
                     word: String::new(),
                     letters: String::new(),
-                })
-        });
+                });
         acting_data.pending_success = false;
         battle_state.phase = BattlePhase::Idle;
         succeeded.write(ActingSucceeded {
@@ -292,12 +287,18 @@ pub(crate) fn find_best_match(
         .map(|(target, results, _, _)| (target, results))
 }
 
+fn targets_from_hand(hand: &[SpellDef]) -> Vec<dictionary::Futharkation> {
+    hand.iter().map(SpellDef::as_futharkation).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::futhark;
+    use crate::health::PlayerCombatState;
     use crate::rune_words::battle::configure_battle;
     use crate::rune_words::rune_slots::{RuneSlot, configure_rune_slots};
+    use crate::spellbook::SpellDef;
     use bevy::time::TimeUpdateStrategy;
     use std::time::Duration;
 
@@ -339,6 +340,7 @@ mod tests {
             robed_spec: Handle::default(),
             spellbook: Handle::default(),
         });
+        app.insert_resource(PlayerCombatState::default());
         app
     }
 
@@ -383,6 +385,23 @@ mod tests {
         }
     }
 
+    fn set_hand_from_targets(app: &mut App, targets: &[dictionary::Futharkation]) {
+        let mut player = app.world_mut().resource_mut::<PlayerCombatState>();
+        player.hand = targets
+            .iter()
+            .map(|target| SpellDef {
+                word: target.word.clone(),
+                effects: Vec::new(),
+                futharkation: target.letters.clone(),
+            })
+            .collect();
+    }
+
+    fn start_acting_with_targets(app: &mut App, targets: Vec<dictionary::Futharkation>) {
+        set_hand_from_targets(app, &targets);
+        app.world_mut().write_message(StartActing);
+    }
+
     // --- unit tests for find_best_match ---
 
     #[test]
@@ -425,13 +444,14 @@ mod tests {
     #[test]
     fn start_acting_spawns_slots_for_longest_target() {
         let mut app = make_test_app();
-        app.world_mut().write_message(StartActing {
-            targets: vec![
+        start_acting_with_targets(
+            &mut app,
+            vec![
                 futha("aa", "fu"),
                 futha("bbbbb", "futar"),
                 futha("ccc", "fut"),
             ],
-        });
+        );
         app.update();
         let state = app.world().resource::<BattleState>();
         assert_eq!(
@@ -445,8 +465,7 @@ mod tests {
     #[test]
     fn start_acting_ignores_empty_targets() {
         let mut app = make_test_app();
-        app.world_mut()
-            .write_message(StartActing { targets: vec![] });
+        start_acting_with_targets(&mut app, vec![]);
         app.update();
         let state = app.world().resource::<BattleState>();
         assert_eq!(
@@ -457,21 +476,19 @@ mod tests {
     }
 
     #[test]
-    fn acting_two_correct_marks_pending_success() {
+    fn acting_full_match_marks_pending_success() {
         let mut app = make_test_app();
-        app.world_mut().write_message(StartActing {
-            targets: vec![futha("fable", "futar")],
-        });
+        start_acting_with_targets(&mut app, vec![futha("fable", "futar")]);
         app.update();
 
-        fill_active_row(&mut app, "futxx");
+        fill_active_row(&mut app, "futar");
         app.world_mut().write_message(EnterActiveRuneWord);
         app.update();
 
         let acting_data = app.world().resource::<ActingData>();
         assert!(
             acting_data.pending_success,
-            "3 correct runes should set pending_success"
+            "full match should set pending_success"
         );
     }
 
@@ -479,33 +496,30 @@ mod tests {
     fn acting_success_keeps_accepting_book_words() {
         let mut app = make_test_app();
         let targets = vec![futha("fable", "futar"), futha("dune", "dune")];
-        app.world_mut().write_message(StartActing {
-            targets: targets.clone(),
-        });
+        start_acting_with_targets(&mut app, targets.clone());
         app.update();
 
-        fill_active_row(&mut app, "futxx");
+        fill_active_row(&mut app, "futar");
         app.world_mut().write_message(EnterActiveRuneWord);
         app.update();
 
         let acting_data = app.world().resource::<ActingData>();
         assert!(acting_data.pending_success);
         assert_eq!(
-            acting_data.targets, targets,
-            "success should not collapse acting targets to one matched word"
+            app.world().resource::<PlayerCombatState>().hand.len(),
+            targets.len(),
+            "success should not mutate the hand before acting succeeds"
         );
     }
 
     #[test]
-    fn acting_fewer_than_two_correct_does_not_set_pending_success() {
+    fn acting_partial_match_does_not_set_pending_success() {
         let mut app = make_test_app();
-        app.world_mut().write_message(StartActing {
-            targets: vec![futha("fable", "futar")],
-        });
+        start_acting_with_targets(&mut app, vec![futha("fable", "futar")]);
         app.update();
 
-        // only 1 correct ('f')
-        fill_active_row(&mut app, "fxxxx");
+        // 3/5 correct should still fail under exact-match success.
+        fill_active_row(&mut app, "futxx");
         app.world_mut().write_message(EnterActiveRuneWord);
         app.update();
 
@@ -516,12 +530,10 @@ mod tests {
     #[test]
     fn acting_success_sends_succeeded_and_transitions_to_idle() {
         let mut app = make_test_app();
-        app.world_mut().write_message(StartActing {
-            targets: vec![futha("fable", "futar")],
-        });
+        start_acting_with_targets(&mut app, vec![futha("fable", "futar")]);
         app.update();
 
-        fill_active_row(&mut app, "futxx");
+        fill_active_row(&mut app, "futar");
         app.world_mut().write_message(EnterActiveRuneWord);
         app.update();
 
@@ -541,9 +553,7 @@ mod tests {
     #[test]
     fn acting_failure_spawns_new_row_and_stays_acting() {
         let mut app = make_test_app();
-        app.world_mut().write_message(StartActing {
-            targets: vec![futha("fable", "futar")],
-        });
+        start_acting_with_targets(&mut app, vec![futha("fable", "futar")]);
         app.update();
 
         // only 1 correct → failure
@@ -567,9 +577,7 @@ mod tests {
     #[test]
     fn acting_failure_increments_resolved_count() {
         let mut app = make_test_app();
-        app.world_mut().write_message(StartActing {
-            targets: vec![futha("fable", "futar")],
-        });
+        start_acting_with_targets(&mut app, vec![futha("fable", "futar")]);
         app.update();
 
         fill_active_row(&mut app, "fxxxx");
@@ -587,12 +595,10 @@ mod tests {
     #[test]
     fn acting_failure_queues_typed_input_for_next_row_in_order() {
         let mut app = make_test_app();
-        app.world_mut().write_message(StartActing {
-            targets: vec![futha("fable", "futar")],
-        });
+        start_acting_with_targets(&mut app, vec![futha("fable", "futar")]);
         app.update();
 
-        // Force failure (fewer than 2 correct).
+        // Force failure (partial match).
         fill_active_row(&mut app, "fxxxx");
         app.world_mut().write_message(EnterActiveRuneWord);
         app.update();
@@ -604,7 +610,7 @@ mod tests {
         app.world_mut()
             .write_message(futhark::TypedFutharkInput('a'));
 
-        for _ in 0..12 {
+        for _ in 0..16 {
             app.update();
         }
 
@@ -617,12 +623,10 @@ mod tests {
     #[test]
     fn acting_success_ignores_typed_input_during_grading_animation() {
         let mut app = make_test_app();
-        app.world_mut().write_message(StartActing {
-            targets: vec![futha("fable", "futar")],
-        });
+        start_acting_with_targets(&mut app, vec![futha("fable", "futar")]);
         app.update();
 
-        fill_active_row(&mut app, "futxx");
+        fill_active_row(&mut app, "futar");
         app.world_mut().write_message(EnterActiveRuneWord);
         app.update();
 
@@ -641,9 +645,7 @@ mod tests {
         );
 
         // Start a fresh acting round and verify no buffered input leaked through.
-        app.world_mut().write_message(StartActing {
-            targets: vec![futha("again", "futar")],
-        });
+        start_acting_with_targets(&mut app, vec![futha("again", "futar")]);
         app.update();
 
         let row = active_row_letters(&mut app);

@@ -204,26 +204,32 @@ mod tests {
             SpellDef {
                 word: "a".into(),
                 effects: vec![SpellEffect::Damage { amount: 1 }],
+                futharkation: "a".into(),
             },
             SpellDef {
                 word: "b".into(),
                 effects: vec![SpellEffect::Damage { amount: 2 }],
+                futharkation: "b".into(),
             },
             SpellDef {
                 word: "c".into(),
                 effects: vec![SpellEffect::Damage { amount: 3 }],
+                futharkation: "c".into(),
             },
             SpellDef {
                 word: "d".into(),
                 effects: vec![SpellEffect::Damage { amount: 4 }],
+                futharkation: "d".into(),
             },
             SpellDef {
                 word: "e".into(),
                 effects: vec![SpellEffect::Damage { amount: 5 }],
+                futharkation: "e".into(),
             },
             SpellDef {
                 word: "f".into(),
                 effects: vec![SpellEffect::Damage { amount: 6 }],
+                futharkation: "f".into(),
             },
         ]
     }
@@ -313,6 +319,7 @@ mod tests {
             &[SpellDef {
                 word: "only".into(),
                 effects: Vec::new(),
+                futharkation: "only".into(),
             }],
             &mut rng,
         );

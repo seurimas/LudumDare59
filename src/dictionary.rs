@@ -70,6 +70,39 @@ pub fn load_default_futharkations() -> Result<Vec<Futharkation>, String> {
     collect_futharkations(&pronunciations)
 }
 
+pub fn futharkation_from_word(word: &str) -> Result<Futharkation, String> {
+    let pronunciations = load_default_pronunciations()?;
+    futharkation_from_word_in_pronunciations(&pronunciations, word)
+}
+
+pub fn futharkation_from_word_with_override(
+    word: &str,
+    override_letters: Option<&str>,
+) -> Result<Futharkation, String> {
+    if let Some(letters) = override_letters {
+        let letters = letters.trim();
+        if letters.is_empty() {
+            return Err(format!("spell '{word}' has an empty futharkation override"));
+        }
+
+        if let Some(invalid) = letters
+            .chars()
+            .find(|&symbol| futhark::letter_to_index(symbol).is_none())
+        {
+            return Err(format!(
+                "spell '{word}' has invalid futhark symbol '{invalid}' in override '{letters}'"
+            ));
+        }
+
+        return Ok(Futharkation {
+            word: word.to_string(),
+            letters: letters.to_string(),
+        });
+    }
+
+    futharkation_from_word(word)
+}
+
 pub fn random_futharkation_with_rune_length<R: Rng + ?Sized>(
     rune_length: usize,
     rng: &mut R,
@@ -130,6 +163,26 @@ fn collect_futharkations(pronunciations: &[Pronunciation]) -> Result<Vec<Futhark
                 .map_err(|missing| missing.to_string())
         })
         .collect()
+}
+
+fn futharkation_from_word_in_pronunciations(
+    pronunciations: &[Pronunciation],
+    word: &str,
+) -> Result<Futharkation, String> {
+    let Some(pronunciation) = pronunciations
+        .iter()
+        .find(|pronunciation| pronunciation.word.eq_ignore_ascii_case(word))
+    else {
+        return Err(format!(
+            "word '{word}' was not found in default pronunciations"
+        ));
+    };
+
+    let mut mapped = pronunciation
+        .to_futharkation()
+        .map_err(|missing| missing.to_string())?;
+    mapped.word = word.to_string();
+    Ok(mapped)
 }
 
 fn random_futharkation_with_rune_length_from_pronunciations<R: Rng + ?Sized>(
@@ -271,5 +324,41 @@ mod tests {
 
         assert_eq!(selected.word, "exact");
         assert_eq!(selected.letters.chars().count(), 5);
+    }
+
+    #[test]
+    fn finds_futharkation_by_word_case_insensitive() {
+        let pronunciations = vec![Pronunciation {
+            word: "icebolt".to_string(),
+            ipa: "isbolt".to_string(),
+        }];
+
+        let mapped =
+            futharkation_from_word_in_pronunciations(&pronunciations, "IceBolt").expect("mapped");
+
+        assert_eq!(mapped.word, "IceBolt");
+        assert_eq!(mapped.letters, "isbolt");
+    }
+
+    #[test]
+    fn override_futharkation_validates_letters() {
+        let mapped = futharkation_from_word_with_override("icebolt", Some("iSbolt"))
+            .expect("override accepted");
+        assert_eq!(mapped.letters, "iSbolt");
+
+        let error = futharkation_from_word_with_override("icebolt", Some("bad!"))
+            .expect_err("invalid override rejected");
+        assert!(error.contains("invalid futhark symbol"));
+    }
+
+    #[test]
+    fn missing_dictionary_word_requires_override() {
+        let error = futharkation_from_word("icebolt").expect_err("word should be missing");
+        assert!(error.contains("not found in default pronunciations"));
+
+        let mapped = futharkation_from_word_with_override("icebolt", Some("isebalt"))
+            .expect("override accepted");
+        assert_eq!(mapped.word, "icebolt");
+        assert_eq!(mapped.letters, "isebalt");
     }
 }

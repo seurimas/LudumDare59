@@ -1,8 +1,10 @@
 use LudumDare59::{
     GameState, acceptance, configure_app, configure_loading, dictionary,
     futhark::{FutharkKeyboardAnimationSpeed, spawn_futhark_keyboard},
+    health::PlayerCombatState,
     rune_words::battle::configure_battle,
     rune_words::battle_states::acting::StartActing,
+    spellbook::SpellDef,
     ui::hud_root::spawn_battle_hud_root,
 };
 use bevy::ecs::message::MessageWriter;
@@ -35,6 +37,7 @@ fn main() {
 fn start_demo(
     mut commands: Commands,
     mut start_acting: MessageWriter<StartActing>,
+    mut player: ResMut<PlayerCombatState>,
     mut speed: ResMut<FutharkKeyboardAnimationSpeed>,
 ) {
     let mut rng = rand::thread_rng();
@@ -50,7 +53,15 @@ fn start_demo(
         .join(" → ");
 
     speed.hue_degrees_per_second = 45.0;
-    start_acting.write(StartActing { targets });
+    player.hand = targets
+        .iter()
+        .map(|target| SpellDef {
+            word: target.word.clone(),
+            effects: Vec::new(),
+            futharkation: target.letters.clone(),
+        })
+        .collect();
+    start_acting.write(StartActing);
 
     commands.spawn((
         Node {
@@ -70,7 +81,7 @@ fn start_demo(
                 TextColor(Color::WHITE),
             ),
             (
-                Text::new("Acting: guess until ≥2 correct. Successful guess ends acting.",),
+                Text::new("Acting: guess the full target word. Full match ends acting.",),
                 TextFont {
                     font_size: 18.0,
                     ..default()
