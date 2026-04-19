@@ -239,6 +239,58 @@
         ]
     },
     {
+        "word": "gem",
+        "starter": true,
+        "effects": [
+            {
+                "type": "stun",
+                "amount": 1.0
+            },
+            {
+                "type": "damage",
+                "amount": 4
+            },
+            {
+                "type": "binding",
+                "amount": 1
+            }
+        ]
+    },
+    {
+        "word": "crystal",
+        "effects": [
+            {
+                "type": "stun",
+                "amount": 2.0
+            },
+            {
+                "type": "damage",
+                "amount": 8
+            },
+            {
+                "type": "binding",
+                "amount": 3
+            }
+        ]
+    },
+    {
+        "word": "diamond",
+        "effects": [
+            {
+                "type": "stun",
+                "amount": 3.0
+            },
+            {
+                "type": "damage",
+                "amount": 12
+            },
+            {
+                "type": "binding",
+                "amount": 5
+            }
+        ]
+    },
+    {
         "word": "disintegrate",
         "effects": [
             {

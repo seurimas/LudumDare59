@@ -10,9 +10,9 @@ use crate::dictionary;
 use crate::health::{NpcAttack, NpcAttackState, NpcCombatState, PlayerCombatState};
 use crate::npcs::NpcSpec;
 use crate::rune_words::battle::{BattlePhase, BattleState, PendingRowGrading};
+use crate::rune_words::battle_states::LastGradedWord;
 use crate::rune_words::battle_states::acting::StartActing;
 use crate::rune_words::battle_states::binding::{BindingData, BindingSucceeded, StartBinding};
-use crate::rune_words::battle_states::{LastGradedWord, WordBook};
 use crate::spellbook::{Book, LearnedSpells};
 use crate::tutorial::TutorialState;
 use crate::ui::effects::EffectsQueue;
@@ -74,7 +74,6 @@ fn reset_adventure_state(
     mut run_stats: ResMut<RunStats>,
     mut pending_grading: ResMut<PendingRowGrading>,
     mut last_graded: ResMut<LastGradedWord>,
-    mut word_book: ResMut<WordBook>,
     npc_query: Query<Entity, With<NpcCombatState>>,
 ) {
     // Player: full health, no shields/buffs, empty deck
@@ -95,7 +94,6 @@ fn reset_adventure_state(
     *binding_data = BindingData::default();
     *pending_grading = PendingRowGrading::default();
     *last_graded = LastGradedWord::default();
-    *word_book = WordBook::default();
     spell_selection.close();
 
     // Reset NPC spawn timer

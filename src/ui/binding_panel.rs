@@ -9,6 +9,15 @@ use crate::ui::palette::*;
 
 const BINDING_ICON_INDEX: usize = 246;
 
+/// Legend entries: (sprite atlas index, name, description of the numbers).
+const LEGEND_ENTRIES: &[(usize, &str, &str)] = &[
+    (250, "Damage", "hp"),
+    (249, "Shield", "hp / seconds"),
+    (248, "Stun", "seconds"),
+    (247, "Buff", "+dmg / seconds"),
+    (246, "Binding", "stacks"),
+];
+
 // ─── Components ───────────────────────────────────────────────────────────────
 
 /// Container for the binding icons (always visible).
@@ -18,6 +27,10 @@ struct BindingIconsArea;
 /// Container for the word list (only visible during Binding phase).
 #[derive(Component)]
 struct BindingWordListArea;
+
+/// Container for the spell-icon legend (visible outside Binding phase).
+#[derive(Component)]
+struct BindingLegendArea;
 
 /// Marker for individual binding icon nodes so we can despawn/rebuild them.
 #[derive(Component)]
@@ -75,6 +88,7 @@ fn spawn_binding_panel(
     }
 
     let font_heading = game_assets.font_cormorant_unicase_semibold.clone();
+    let font_aside = game_assets.font_im_fell_sc.clone();
 
     // Style the panel itself.
     commands
@@ -183,6 +197,57 @@ fn spawn_binding_panel(
                                 },
                             ));
                         });
+
+                    // Legend area (hidden during binding phase)
+                    content
+                        .spawn((
+                            BindingLegendArea,
+                            Node {
+                                flex_grow: 1.0,
+                                flex_direction: FlexDirection::Row,
+                                flex_wrap: FlexWrap::Wrap,
+                                column_gap: Val::Px(12.0),
+                                row_gap: Val::Px(2.0),
+                                align_items: AlignItems::Center,
+                                ..default()
+                            },
+                        ))
+                        .with_children(|legend| {
+                            for (icon_index, name, description) in LEGEND_ENTRIES {
+                                legend
+                                    .spawn(Node {
+                                        flex_direction: FlexDirection::Row,
+                                        column_gap: Val::Px(4.0),
+                                        align_items: AlignItems::Center,
+                                        ..default()
+                                    })
+                                    .with_children(|entry| {
+                                        entry.spawn((
+                                            Node {
+                                                width: Val::Px(16.0),
+                                                height: Val::Px(16.0),
+                                                ..default()
+                                            },
+                                            ImageNode::from_atlas_image(
+                                                game_assets.futhark.clone(),
+                                                TextureAtlas {
+                                                    layout: game_assets.futhark_layout.clone(),
+                                                    index: *icon_index,
+                                                },
+                                            ),
+                                        ));
+                                        entry.spawn((
+                                            Text::new(format!("{name} — {description}")),
+                                            TextFont {
+                                                font: font_aside.clone(),
+                                                font_size: 10.0,
+                                                ..default()
+                                            },
+                                            TextColor(PARCHMENT),
+                                        ));
+                                    });
+                            }
+                        });
                 });
         });
 }
@@ -200,11 +265,27 @@ fn sync_binding_panel(
     existing_words: Query<Entity, With<BindingWordListText>>,
     mut icons_area_node_query: Query<
         &mut Node,
-        (With<BindingIconsArea>, Without<BindingWordListArea>),
+        (
+            With<BindingIconsArea>,
+            Without<BindingWordListArea>,
+            Without<BindingLegendArea>,
+        ),
     >,
     mut word_list_node_query: Query<
         &mut Node,
-        (With<BindingWordListArea>, Without<BindingIconsArea>),
+        (
+            With<BindingWordListArea>,
+            Without<BindingIconsArea>,
+            Without<BindingLegendArea>,
+        ),
+    >,
+    mut legend_node_query: Query<
+        &mut Node,
+        (
+            With<BindingLegendArea>,
+            Without<BindingIconsArea>,
+            Without<BindingWordListArea>,
+        ),
     >,
     mut panel_state: ResMut<BindingPanelState>,
 ) {
@@ -259,7 +340,7 @@ fn sync_binding_panel(
         }
     });
 
-    // ── Update word list area visibility ─────────────────────────────────────
+    // ── Update word list / legend visibility ─────────────────────────────────
     if let Ok(mut word_list_node) = word_list_node_query.single_mut() {
         word_list_node.display = if is_binding_phase {
             Display::Flex
@@ -267,16 +348,18 @@ fn sync_binding_panel(
             Display::None
         };
     }
-
-    // During binding phase, adjust icons area to take only 25% width.
-    if let Ok(mut icons_node) = icons_area_node_query.single_mut() {
-        if is_binding_phase {
-            icons_node.flex_grow = 0.0;
-            icons_node.width = Val::Percent(25.0);
+    if let Ok(mut legend_node) = legend_node_query.single_mut() {
+        legend_node.display = if is_binding_phase {
+            Display::None
         } else {
-            icons_node.flex_grow = 1.0;
-            icons_node.width = Val::Auto;
-        }
+            Display::Flex
+        };
+    }
+
+    // Icons area stays at a fixed share now that something always sits beside it.
+    if let Ok(mut icons_node) = icons_area_node_query.single_mut() {
+        icons_node.flex_grow = 0.0;
+        icons_node.width = Val::Percent(25.0);
     }
 
     // ── Update word list content ─────────────────────────────────────────────
