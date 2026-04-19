@@ -1,0 +1,215 @@
+use LudumDare59::{
+    GameAssets, GameState, acceptance, configure_app, configure_loading, dictionary,
+    futhark::{FutharkKeyboardAnimationSpeed, spawn_futhark_keyboard},
+    health::NpcCombatState,
+    npcs::NpcSpec,
+    rune_words::{
+        battle::{BattleState, NpcType, configure_battle},
+        battle_states::acting::{ActingSucceeded, StartActing},
+    },
+    ui::{arena::NpcSprite, hud_root::spawn_battle_hud_root},
+};
+use bevy::ecs::message::{MessageReader, MessageWriter};
+use bevy::prelude::*;
+
+const TEST_ID: u8 = 11;
+
+fn main() {
+    let mut app = App::new();
+    app.add_plugins(DefaultPlugins);
+    configure_app(&mut app);
+    configure_loading(&mut app);
+    configure_battle(&mut app);
+
+    app.init_resource::<ActiveFight>();
+
+    app.add_systems(
+        OnEnter(GameState::Ready),
+        (
+            spawn_futhark_keyboard.after(spawn_battle_hud_root),
+            spawn_instructions,
+            configure_keyboard_speed,
+        ),
+    );
+    app.add_systems(
+        Update,
+        (
+            pick_npc_on_function_keys,
+            apply_spec_to_spawned_npc,
+            loop_acting_on_success,
+            update_status_label,
+        )
+            .chain()
+            .run_if(in_state(GameState::Ready)),
+    );
+
+    acceptance::initialize_app(
+        &mut app,
+        TEST_ID.into(),
+        "Battle against NPC: F3 = Goblin, F4 = Robed cultist. Stats come from NpcSpec JSON.",
+    );
+
+    app.run();
+}
+
+#[derive(Resource, Default)]
+struct ActiveFight {
+    npc_type: Option<NpcType>,
+    words: Vec<dictionary::Futharkation>,
+    spec_applied: bool,
+    max_health: Option<u32>,
+    attack_count: usize,
+}
+
+#[derive(Component)]
+struct InstructionsPanel;
+
+#[derive(Component)]
+struct StatusLabel;
+
+fn configure_keyboard_speed(mut speed: ResMut<FutharkKeyboardAnimationSpeed>) {
+    speed.hue_degrees_per_second = 45.0;
+}
+
+fn spawn_instructions(mut commands: Commands) {
+    commands
+        .spawn((
+            InstructionsPanel,
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(48.0),
+                top: Val::Px(40.0),
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(6.0),
+                ..default()
+            },
+        ))
+        .with_children(|panel| {
+            panel.spawn((
+                Text::new("Choose your foe:"),
+                TextFont {
+                    font_size: 22.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+            ));
+            panel.spawn((
+                Text::new("F3 - Goblin   |   F4 - Robed cultist"),
+                TextFont {
+                    font_size: 18.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+            ));
+            panel.spawn((
+                Text::new("F1 = pass, F2 = fail"),
+                TextFont {
+                    font_size: 16.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+            ));
+            panel.spawn((
+                StatusLabel,
+                Text::new("No battle active."),
+                TextFont {
+                    font_size: 18.0,
+                    ..default()
+                },
+                TextColor(Color::srgb(0.9, 0.85, 0.55)),
+            ));
+        });
+}
+
+fn pick_npc_on_function_keys(
+    input: Res<ButtonInput<KeyCode>>,
+    game_assets: Res<GameAssets>,
+    specs: Res<Assets<NpcSpec>>,
+    mut battle_state: ResMut<BattleState>,
+    mut fight: ResMut<ActiveFight>,
+    mut start_acting: MessageWriter<StartActing>,
+) {
+    let picked_spec = if input.just_pressed(KeyCode::F3) {
+        specs.get(&game_assets.goblin_spec)
+    } else if input.just_pressed(KeyCode::F4) {
+        specs.get(&game_assets.robed_spec)
+    } else {
+        None
+    };
+
+    let Some(spec) = picked_spec else {
+        return;
+    };
+
+    battle_state.npc_type = Some(spec.npc_type);
+
+    let mut rng = rand::thread_rng();
+    let words: Vec<dictionary::Futharkation> = [3usize, 4, 5, 3, 4]
+        .iter()
+        .filter_map(|&len| dictionary::random_futharkation_with_rune_length(len, &mut rng).ok())
+        .collect();
+
+    fight.npc_type = Some(spec.npc_type);
+    fight.words = words.clone();
+    fight.spec_applied = false;
+    fight.max_health = Some(spec.max_health);
+    fight.attack_count = spec.attacks.len();
+
+    start_acting.write(StartActing { targets: words });
+}
+
+fn apply_spec_to_spawned_npc(
+    mut fight: ResMut<ActiveFight>,
+    mut npcs: Query<&mut NpcCombatState, With<NpcSprite>>,
+) {
+    if fight.spec_applied {
+        return;
+    }
+    let Some(max_health) = fight.max_health else {
+        return;
+    };
+    let Ok(mut npc) = npcs.single_mut() else {
+        return;
+    };
+    npc.max = max_health;
+    npc.hp = max_health;
+    fight.spec_applied = true;
+}
+
+fn loop_acting_on_success(
+    mut succeeded: MessageReader<ActingSucceeded>,
+    fight: Res<ActiveFight>,
+    mut start_acting: MessageWriter<StartActing>,
+) {
+    if succeeded.read().last().is_none() {
+        return;
+    }
+    if fight.words.is_empty() {
+        return;
+    }
+    start_acting.write(StartActing {
+        targets: fight.words.clone(),
+    });
+}
+
+fn update_status_label(fight: Res<ActiveFight>, mut labels: Query<&mut Text, With<StatusLabel>>) {
+    let text = match fight.npc_type {
+        None => "No battle active. Press F3 or F4.".to_string(),
+        Some(npc_type) => {
+            let name = match npc_type {
+                NpcType::Goblin => "Goblin",
+                NpcType::Robed => "Robed cultist",
+            };
+            let hp = fight.max_health.unwrap_or(0);
+            format!(
+                "Fighting {name}: {hp} HP, {} attacks in spec.",
+                fight.attack_count
+            )
+        }
+    };
+    for mut label in &mut labels {
+        if label.0 != text {
+            label.0 = text.clone();
+        }
+    }
+}

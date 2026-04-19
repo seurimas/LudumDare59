@@ -24,12 +24,15 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    use bevy::window::WindowResized;
+
     use super::*;
 
     fn create_test_app() -> App {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins);
         configure_app(&mut app);
+        app.add_message::<WindowResized>();
 
         // Use a fixed timestep so elapsed time progression is deterministic.
         app.insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_millis(

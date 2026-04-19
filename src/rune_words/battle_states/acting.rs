@@ -318,6 +318,8 @@ mod tests {
             font_cormorant_garamond_italic: Handle::default(),
             font_im_fell_sc: Handle::default(),
             font_unifraktur: Handle::default(),
+            goblin_spec: Handle::default(),
+            robed_spec: Handle::default(),
         });
         app
     }
@@ -629,5 +631,4 @@ mod tests {
         let row = active_row_letters(&mut app);
         assert!(row.into_iter().all(|letter| letter.is_none()));
     }
-
 }

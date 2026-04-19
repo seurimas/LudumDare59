@@ -40,7 +40,7 @@ impl BattlePhase {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Deserialize)]
 pub enum NpcType {
     Goblin,
     Robed,

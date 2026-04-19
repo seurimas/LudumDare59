@@ -2,8 +2,8 @@ use bevy::prelude::*;
 
 use crate::GameAssets;
 use crate::GameState;
+use crate::health::{NpcCombatState, PlayerCombatState};
 use crate::rune_words::battle::BattleState;
-use crate::health::{NpcHealthState, PlayerHealthState};
 use crate::ui::hud_root::CombatBar;
 use crate::ui::palette::*;
 
@@ -487,8 +487,8 @@ fn sync_hp_bars(
         &mut Text,
         (With<HpLabel>, With<EnemyHpLabel>, Without<PlayerHpLabel>),
     >,
-    player_health: Res<PlayerHealthState>,
-    npc_query: Query<&NpcHealthState>,
+    player_health: Res<PlayerCombatState>,
+    npc_query: Query<&NpcCombatState>,
 ) {
     let active_npc_health = npc_query.iter().next();
 

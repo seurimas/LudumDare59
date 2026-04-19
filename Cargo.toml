@@ -49,3 +49,7 @@ path = "tests/acceptance/shows_acting_battle_state.rs"
 [[bin]]
 name = "uat_battle_stages"
 path = "tests/acceptance/uat_battle_stages.rs"
+
+[[bin]]
+name = "uat_battle_against_npc"
+path = "tests/acceptance/uat_battle_against_npc.rs"

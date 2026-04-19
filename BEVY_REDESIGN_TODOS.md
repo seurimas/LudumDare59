@@ -16,8 +16,8 @@ dependency order. Check items off as they are completed.
       `GOLD`, `BLOOD`, `NIGHT`, etc. constants (see §0.3 of plan)
 - [x] Add `BattleUiClock` resource (`src/ui/clock.rs`) with `elapsed: f32`
       and a `tick_clock` system running in `Update` while `GameState::Ready`
-- [x] Add health state: `PlayerHealthState { hp, max }` as a `Resource`
-      (`src/ui/health.rs`); `NpcHealthState { hp, max }` as a `Component`
+- [x] Add health state: `PlayerCombatState { hp, max }` as a `Resource`
+      (`src/ui/health.rs`); `NpcCombatState { hp, max }` as a `Component`
       attached to the NPC sprite entity — stub with fixed values initially
 - [x] Register all new fonts in `GameAssets` (`src/lib.rs`) via
       `bevy_asset_loader` `#[asset(...)]` fields (CormorantUnicase
@@ -139,8 +139,8 @@ dependency order. Check items off as they are completed.
 - [x] Spawn `HpBarNode` for each side:
       - Outer node: `Overflow::clip()`, 1px GOLD_DARK border
       - Fill node (absolute): width driven by the relevant health state
-        (player fill reads `PlayerHealthState`; enemy fill reads the
-        spawned NPC's `NpcHealthState`)
+        (player fill reads `PlayerCombatState`; enemy fill reads the
+        spawned NPC's `NpcCombatState`)
       - Tick overlay: 10 flex-row children with divider borders
       - HP text label (absolute, centered): IM Fell SC, PARCHMENT color
 - [x] Spawn `PhaseBannerNode` (center column of combat bar):
@@ -148,8 +148,8 @@ dependency order. Check items off as they are completed.
       - Phase name text (Cormorant Unicase Bold, GOLD_LIGHT)
         — reads "Combat" for the combat phase
       - 3 pip row (inactive/active driven by phase index)
-- [x] Add `sync_hp_bars` system: reads `PlayerHealthState` and the active
-      NPC's `NpcHealthState`, updates fill node widths
+- [x] Add `sync_hp_bars` system: reads `PlayerCombatState` and the active
+      NPC's `NpcCombatState`, updates fill node widths
 - [x] Add `sync_phase_banner` system: reads `BattleState.phase`, updates
       text and pip colors
 

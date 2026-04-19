@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy_aspect_ratio_mask::{AspectRatioPlugin, Resolution};
 use bevy_asset_loader::prelude::*;
 
-use crate::health::PlayerHealthState;
+use crate::health::PlayerCombatState;
 
 pub mod acceptance;
 pub mod audio;
@@ -11,6 +11,7 @@ pub mod dictionary;
 pub mod futhark;
 pub mod health;
 pub mod loading;
+pub mod npcs;
 pub mod rune_words;
 pub mod ui;
 
@@ -91,6 +92,10 @@ pub struct GameAssets {
     pub font_im_fell_sc: Handle<Font>,
     #[asset(path = "fonts/UnifrakturMaguntia-Regular.ttf")]
     pub font_unifraktur: Handle<Font>,
+    #[asset(path = "npcs/goblin.npc.json")]
+    pub goblin_spec: Handle<npcs::NpcSpec>,
+    #[asset(path = "npcs/robed.npc.json")]
+    pub robed_spec: Handle<npcs::NpcSpec>,
 }
 
 pub fn configure_app(app: &mut App) {
@@ -106,7 +111,7 @@ pub fn configure_app(app: &mut App) {
     rune_words::rune_slots::configure_rune_slots(app);
     ui::configure_ui(app);
 
-    app.init_resource::<PlayerHealthState>();
+    app.init_resource::<PlayerCombatState>();
 
     app.add_systems(
         Update,
@@ -139,5 +144,6 @@ pub fn configure_app(app: &mut App) {
 
 pub fn configure_loading(app: &mut App) {
     audio::configure_audio(app);
+    npcs::configure_npcs(app);
     loading::configure_loading(app);
 }

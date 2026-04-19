@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 
+use crate::health::NpcCombatState;
 use crate::rune_words::battle::{BattlePhase, BattleState, NpcType};
 use crate::ui::clock::{BattleUiClock, wave};
-use crate::health::NpcHealthState;
 use crate::ui::hud_root::ArenaPanel;
 use crate::ui::palette::*;
 use crate::{GameAssets, GameState};
@@ -267,7 +267,7 @@ fn sync_npc_sprite(
             // NPC sprite: ~22% wide, centered horizontally, 28% from top
             arena.spawn((
                 NpcSprite,
-                NpcHealthState::default(),
+                NpcCombatState::default(),
                 Node {
                     position_type: PositionType::Absolute,
                     top: Val::Percent(28.0),

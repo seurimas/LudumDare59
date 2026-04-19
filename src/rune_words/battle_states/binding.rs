@@ -340,6 +340,8 @@ mod tests {
             font_cormorant_garamond_italic: Handle::default(),
             font_im_fell_sc: Handle::default(),
             font_unifraktur: Handle::default(),
+            goblin_spec: Handle::default(),
+            robed_spec: Handle::default(),
         });
         app
     }
