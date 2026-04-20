@@ -57,3 +57,7 @@ path = "tests/acceptance/uat_battle_against_npc.rs"
 [[bin]]
 name = "uat_shows_spell_selection"
 path = "tests/acceptance/shows_spell_selection.rs"
+
+[[bin]]
+name = "futhark_it"
+path = "tests/futhark_it.rs"

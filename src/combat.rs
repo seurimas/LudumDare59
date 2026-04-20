@@ -485,14 +485,15 @@ fn tick_npc_spawn_timer(
         spawn_timer.sentence_played = false;
     }
 
+    // Wait for any prior audio (e.g. binding success/failure sentence) to finish
+    if audio_queue.is_playing() {
+        return;
+    }
+
     // Play the sentence once when the timer starts
     if !spawn_timer.sentence_played {
         spawn_timer.sentence_played = true;
         play_letters.write(PlayFutharkLetters(SENTENCE_GAME_START.to_string()));
-    }
-
-    // Wait for the audio to finish before counting down
-    if audio_queue.is_playing() {
         return;
     }
 

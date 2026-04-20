@@ -197,7 +197,7 @@ pub fn tick_word_audio_queue(
     time: Res<Time>,
     mut commands: Commands,
 ) {
-    if queue.pending.is_empty() {
+    if queue.pending.is_empty() && queue.elapsed >= queue.current_duration {
         return;
     }
     queue.elapsed += time.delta_secs();
