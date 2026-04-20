@@ -1,7 +1,6 @@
 use bevy::ecs::message::{MessageReader, MessageWriter};
 use bevy::prelude::*;
-use rand::Rng;
-use rand::seq::SliceRandom;
+use rand::prelude::*;
 
 use crate::GameAssets;
 use crate::GameState;
@@ -174,7 +173,7 @@ fn reset_player_deck_on_battle_start(
     };
     // Only do a full reset on the very first battle (empty deck+hand+discard).
     // Subsequent battles keep the player's hand and deck intact, just draw up.
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     if player.deck.is_empty() && player.hand.is_empty() && player.discard.is_empty() {
         let known: Vec<_> = learned
             .filter_spells(book.spells())
@@ -260,7 +259,7 @@ fn tick_npc_attacks(
             && !npc.attacks.is_empty();
 
         if needs_attack {
-            let idx = rand::thread_rng().gen_range(0..npc.attacks.len());
+            let idx = rand::random_range(0..npc.attacks.len());
             let attack = npc.attacks[idx];
             npc.chosen_attack = Some(attack);
             npc.attack_state = NpcAttackState::WaitingFor(attack.thinking_time);
@@ -275,6 +274,7 @@ fn setup_binding_target_on_battle_start(
     battle_state: Res<BattleState>,
     tutorial: Option<Res<TutorialState>>,
     mut binding_data: ResMut<BindingData>,
+    cached_pronunciations: Option<Res<dictionary::CachedPronunciations>>,
 ) {
     if events.read().count() == 0 {
         return;
@@ -285,7 +285,12 @@ fn setup_binding_target_on_battle_start(
 
     // During tutorial, use a fixed binding word
     if tutorial.as_ref().is_some_and(|t| t.active) {
-        match dictionary::futharkation_from_word(crate::tutorial::TUTORIAL_BINDING_WORD) {
+        let result = if let Some(ref cached) = cached_pronunciations {
+            cached.futharkation_from_word(crate::tutorial::TUTORIAL_BINDING_WORD)
+        } else {
+            dictionary::futharkation_from_word(crate::tutorial::TUTORIAL_BINDING_WORD)
+        };
+        match result {
             Ok(futharkation) => {
                 binding_data.target = Some(futharkation);
                 binding_data.attempts_remaining = 0; // unlimited attempts
@@ -305,12 +310,17 @@ fn setup_binding_target_on_battle_start(
         return;
     };
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let Some(word) = spec.binding_words.choose(&mut rng) else {
         return;
     };
 
-    match dictionary::futharkation_from_word(word) {
+    let result = if let Some(ref cached) = cached_pronunciations {
+        cached.futharkation_from_word(word)
+    } else {
+        dictionary::futharkation_from_word(word)
+    };
+    match result {
         Ok(futharkation) => {
             binding_data.target = Some(futharkation);
         }
@@ -534,7 +544,7 @@ fn tick_npc_spawn_timer(
     };
 
     let candidates: Vec<&Handle<NpcSpec>> = vec![&game_assets.goblin_spec, &game_assets.robed_spec];
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let Some(&chosen_handle) = candidates.choose(&mut rng) else {
         return;
     };

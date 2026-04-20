@@ -56,7 +56,7 @@ fn refill_hand_on_acting_success(
         return;
     };
     let in_tutorial = tutorial.map_or(false, |t| t.active);
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     for event in events.read() {
         if player.cast_from_hand(&event.matched.word) {
             if !in_tutorial {

@@ -1,8 +1,33 @@
 use std::fmt;
 
 use crate::futhark;
-use rand::Rng;
-use rand::seq::IteratorRandom;
+use bevy::prelude::*;
+use rand::prelude::*;
+
+/// Pre-parsed pronunciations from the default dictionary, cached as a Bevy resource.
+#[derive(Resource)]
+pub struct CachedPronunciations(pub Vec<Pronunciation>);
+
+impl CachedPronunciations {
+    pub fn load() -> Result<Self, String> {
+        load_default_pronunciations().map(Self)
+    }
+
+    pub fn futharkation_from_word(&self, word: &str) -> Result<Futharkation, String> {
+        futharkation_from_word_in_pronunciations(&self.0, word)
+    }
+
+    pub fn futharkation_from_word_with_override(
+        &self,
+        word: &str,
+        override_letters: Option<&str>,
+    ) -> Result<Futharkation, String> {
+        if let Some(letters) = override_letters {
+            return futharkation_from_word_with_override(word, Some(letters));
+        }
+        self.futharkation_from_word(word)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Pronunciation {

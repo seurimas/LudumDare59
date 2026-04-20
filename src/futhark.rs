@@ -1,6 +1,6 @@
 use bevy::ecs::message::MessageReader;
 use bevy::prelude::*;
-use rand::Rng;
+use rand::prelude::*;
 
 use crate::GameAssets;
 
@@ -138,7 +138,7 @@ pub fn play_futhark_key_sound(
         let handle = if handles.len() == 1 {
             handles[0].clone()
         } else {
-            let i = rand::thread_rng().gen_range(0..handles.len());
+            let i = rand::random_range(0..handles.len());
             handles[i].clone()
         };
         commands.spawn((

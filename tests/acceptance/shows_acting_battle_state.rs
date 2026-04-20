@@ -40,7 +40,7 @@ fn start_demo(
     mut player: ResMut<PlayerCombatState>,
     mut speed: ResMut<FutharkKeyboardAnimationSpeed>,
 ) {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let targets: Vec<_> = [3, 4, 5]
         .iter()
         .filter_map(|&len| dictionary::random_futharkation_with_rune_length(len, &mut rng).ok())

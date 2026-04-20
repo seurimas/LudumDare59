@@ -1,7 +1,7 @@
 use bevy::asset::io::Reader;
 use bevy::asset::{AssetLoader, LoadContext};
 use bevy::prelude::*;
-use rand::Rng;
+use rand::prelude::*;
 use serde::Deserialize;
 
 use super::params::SoundParams;
@@ -75,6 +75,6 @@ pub fn pick_params(config: Option<&FutharkSoundConfig>, index: usize) -> SoundPa
     match variants {
         None => SoundParams::default(),
         Some(v) if v.len() == 1 => v[0].clone(),
-        Some(v) => v[rand::thread_rng().gen_range(0..v.len())].clone(),
+        Some(v) => v[rand::random_range(0..v.len())].clone(),
     }
 }

@@ -166,7 +166,7 @@ fn pick_npc_on_function_keys(
 
     battle_state.npc = Some(spec.clone());
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let words: Vec<dictionary::Futharkation> = [3usize, 4, 5, 3, 4]
         .iter()
         .filter_map(|&len| dictionary::random_futharkation_with_rune_length(len, &mut rng).ok())

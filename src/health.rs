@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use rand::seq::SliceRandom;
+use rand::prelude::*;
 use serde::Deserialize;
 
 use crate::spellbook::{SpellDef, SpellEffect};

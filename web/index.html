@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Runic Ascendancy</title>
+<style>
+    html, body {
+        height: 100%;
+        margin: 0;
+        background: #1a1a2e;
+    }
+    .game-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        height: 100%;
+    }
+    #bevy {
+        background-color: #000;
+        width: 1280px;
+        height: 720px;
+    }
+</style>
+</head>
+<body>
+    <!-- Resume AudioContext on first user interaction (browser autoplay policy) -->
+    <script>
+    (() => {
+        const contexts = [];
+        const events = ['click','contextmenu','auxclick','dblclick','mousedown','mouseup','pointerup','touchend','keydown','keyup'];
+        const handler = () => {
+            let running = 0;
+            contexts.forEach(c => { if (c.state !== 'running') c.resume(); else running++; });
+            if (running === contexts.length && contexts.length > 0) events.forEach(e => document.removeEventListener(e, handler));
+        };
+        self.AudioContext = new Proxy(self.AudioContext, {
+            construct(target, args) { const ctx = new target(...args); contexts.push(ctx); return ctx; }
+        });
+        events.forEach(e => document.addEventListener(e, handler));
+    })();
+    </script>
+    <div class="game-container">
+        <canvas id="bevy">JavaScript and canvas support required</canvas>
+    </div>
+    <script type="module">
+        import init from './LudumDare59.js';
+        init('./LudumDare59_bg.wasm');
+    </script>
+</body>
+</html>

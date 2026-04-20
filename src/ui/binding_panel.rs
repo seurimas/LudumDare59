@@ -296,6 +296,7 @@ fn sync_binding_panel(
     mut panel_state: ResMut<BindingPanelState>,
     eliminated_keys: Option<Res<EliminatedFutharkKeys>>,
     tutorial: Option<Res<TutorialState>>,
+    cached_pronunciations: Option<Res<dictionary::CachedPronunciations>>,
 ) {
     let Some(game_assets) = game_assets else {
         return;
@@ -400,9 +401,12 @@ fn sync_binding_panel(
             panel_state.cached_futharkations = binding_words
                 .iter()
                 .filter_map(|w| {
-                    dictionary::futharkation_from_word(w)
-                        .ok()
-                        .map(|f| (w.clone(), f.letters))
+                    let result = if let Some(ref cached) = cached_pronunciations {
+                        cached.futharkation_from_word(w)
+                    } else {
+                        dictionary::futharkation_from_word(w)
+                    };
+                    result.ok().map(|f| (w.clone(), f.letters))
                 })
                 .collect();
         }

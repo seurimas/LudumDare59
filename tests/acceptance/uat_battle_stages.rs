@@ -81,7 +81,7 @@ fn setup_demo(
         return;
     };
     battle_state.npc = Some(spec.clone());
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     let words: Vec<dictionary::Futharkation> = [3usize, 4, 5, 3, 4]
         .iter()
@@ -164,7 +164,7 @@ fn on_acting_succeeded(
     if flow.binding_unlocked_by_quicktime {
         flow.binding_unlocked_by_quicktime = false;
         start_binding.write(StartBinding(Some(
-            dictionary::random_futharkation_with_rune_length(5, &mut thread_rng()).unwrap(),
+            dictionary::random_futharkation_with_rune_length(5, &mut rng()).unwrap(),
         )));
         return;
     }

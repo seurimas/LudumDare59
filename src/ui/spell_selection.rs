@@ -1,7 +1,7 @@
 use bevy::ecs::message::MessageReader;
 use bevy::prelude::*;
 use bevy_aspect_ratio_mask::Hud;
-use rand::seq::SliceRandom;
+use rand::prelude::*;
 
 use crate::GameAssets;
 use crate::GameState;
@@ -99,7 +99,7 @@ fn open_selection_on_binding_success(
         return;
     };
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut candidates: Vec<Candidate> = Vec::new();
 
     let unlearned: Vec<String> = book

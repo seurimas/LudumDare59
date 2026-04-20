@@ -38,7 +38,7 @@ fn start_demo(
     mut start_binding: MessageWriter<StartBinding>,
     mut speed: ResMut<FutharkKeyboardAnimationSpeed>,
 ) {
-    let selected = dictionary::random_futharkation_with_rune_length(5, &mut rand::thread_rng())
+    let selected = dictionary::random_futharkation_with_rune_length(5, &mut rand::rng())
         .expect("default dictionary should contain a five-rune futharkation");
 
     speed.hue_degrees_per_second = 45.0;
@@ -76,7 +76,7 @@ fn start_demo(
 
 fn reset_on_f3(keys: Res<ButtonInput<KeyCode>>, mut start_binding: MessageWriter<StartBinding>) {
     if keys.just_pressed(KeyCode::F3) {
-        let selected = dictionary::random_futharkation_with_rune_length(5, &mut rand::thread_rng())
+        let selected = dictionary::random_futharkation_with_rune_length(5, &mut rand::rng())
             .expect("default dictionary should contain a five-rune futharkation");
         start_binding.write(StartBinding(Some(selected)));
     }

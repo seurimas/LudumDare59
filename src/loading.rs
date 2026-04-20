@@ -207,6 +207,17 @@ fn process_next_letter(
         std::mem::swap(&mut baked.regular, &mut queue.regular_samples);
         std::mem::swap(&mut baked.conversational, &mut queue.conversational_samples);
         commands.insert_resource(baked);
+
+        // Pre-parse the pronunciation dictionary so binding doesn't re-parse it each time.
+        match crate::dictionary::CachedPronunciations::load() {
+            Ok(cached) => {
+                commands.insert_resource(cached);
+            }
+            Err(e) => {
+                bevy::log::error!("Failed to pre-parse pronunciation dictionary: {e}");
+            }
+        }
+
         next_state.set(GameState::MainMenu);
     }
 }

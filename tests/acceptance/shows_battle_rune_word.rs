@@ -36,7 +36,7 @@ fn start_random_battle_demo(
     mut start_battle: MessageWriter<StartBattle>,
     mut speed: ResMut<FutharkKeyboardAnimationSpeed>,
 ) {
-    let selected = dictionary::random_futharkation_with_rune_length(5, &mut rand::thread_rng())
+    let selected = dictionary::random_futharkation_with_rune_length(5, &mut rand::rng())
         .expect("default dictionary should contain a five-rune futharkation");
 
     speed.hue_degrees_per_second = 45.0;
