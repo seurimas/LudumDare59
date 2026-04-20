@@ -9,6 +9,8 @@ use crate::rune_words::battle::NpcType;
 #[derive(Asset, TypePath, Deserialize, Debug, Clone)]
 pub struct NpcSpec {
     pub max_health: u32,
+    #[serde(default)]
+    pub health_growth: u32,
     pub npc_type: NpcType,
     pub attacks: Vec<NpcAttackSpec>,
     #[serde(default)]

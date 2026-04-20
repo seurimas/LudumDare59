@@ -305,7 +305,7 @@
         "futharkation": "ambuS",
         "effects": [
             {
-                "type": "full_damage",
+                "type": "fulldamage",
                 "amount": 15
             }
         ]
@@ -316,7 +316,7 @@
         "futharkation": "bakstab",
         "effects": [
             {
-                "type": "full_damage",
+                "type": "fulldamage",
                 "amount": 20
             }
         ]
@@ -327,7 +327,7 @@
         "futharkation": "uak",
         "effects": [
             {
-                "type": "full_damage",
+                "type": "fulldamage",
                 "amount": 10
             },
             {
@@ -341,7 +341,7 @@
         "futharkation": "sizigi",
         "effects": [
             {
-                "type": "z_damage",
+                "type": "zdamage",
                 "amount": 18
             }
         ]
@@ -351,7 +351,7 @@
         "futharkation": "Tot",
         "effects": [
             {
-                "type": "t_damage",
+                "type": "tdamage",
                 "amount": 18
             }
         ]

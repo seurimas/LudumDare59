@@ -31,6 +31,8 @@ pub enum GameState {
 #[derive(Resource, Default)]
 pub struct RunStats {
     pub enemies_defeated: u32,
+    /// How many times each NPC type has been killed this run.
+    pub kills_by_type: std::collections::HashMap<crate::rune_words::battle::NpcType, u32>,
 }
 
 #[derive(AssetCollection, Resource)]

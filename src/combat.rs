@@ -116,6 +116,7 @@ fn reset_adventure_state(
 
     // Reset run stats
     run_stats.enemies_defeated = 0;
+    run_stats.kills_by_type.clear();
 
     // Despawn any leftover NPC entities
     for entity in &npc_query {
@@ -339,9 +340,13 @@ fn apply_npc_damage_to_player(
 fn track_enemies_defeated(
     mut events: MessageReader<BindingSucceeded>,
     mut run_stats: ResMut<RunStats>,
+    battle_state: Res<BattleState>,
 ) {
     for _ in events.read() {
         run_stats.enemies_defeated += 1;
+        if let Some(spec) = battle_state.npc.as_ref() {
+            *run_stats.kills_by_type.entry(spec.npc_type).or_insert(0) += 1;
+        }
     }
 }
 

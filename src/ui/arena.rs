@@ -5,7 +5,7 @@ use crate::rune_words::battle::{BattlePhase, BattleState, NpcType};
 use crate::ui::clock::{BattleUiClock, wave};
 use crate::ui::hud_root::ArenaPanel;
 use crate::ui::palette::*;
-use crate::{GameAssets, GameState};
+use crate::{GameAssets, GameState, RunStats};
 
 // ─── Components ───────────────────────────────────────────────────────────────
 
@@ -250,6 +250,7 @@ fn sync_npc_sprite(
     mut commands: Commands,
     game_assets: Res<GameAssets>,
     battle_state: Option<Res<BattleState>>,
+    run_stats: Res<RunStats>,
     panel_query: Query<Entity, With<ArenaPanel>>,
     mut npc_query: Query<
         (Entity, &mut ImageNode, &NpcCombatState),
@@ -299,8 +300,10 @@ fn sync_npc_sprite(
         };
 
         let mut combat_state = NpcCombatState::default();
-        combat_state.max = npc_spec.max_health;
-        combat_state.hp = npc_spec.max_health;
+        let deaths = run_stats.kills_by_type.get(&npc_type).copied().unwrap_or(0);
+        let scaled_health = npc_spec.max_health + npc_spec.health_growth * deaths;
+        combat_state.max = scaled_health;
+        combat_state.hp = scaled_health;
         combat_state.attacks = npc_spec.attacks.clone();
         combat_state.bindings = npc_spec.minimum_bindings;
 
