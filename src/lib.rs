@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy_aspect_ratio_mask::{AspectRatioPlugin, Resolution};
 use bevy_asset_loader::prelude::*;
+use wasm_bindgen::prelude::*;
 
 use crate::health::PlayerCombatState;
 
@@ -45,7 +46,7 @@ pub struct GameAssets {
     #[asset(paths(
         "sound/f.ogg",
         "sound/u.ogg",
-        "sound/T.ogg",
+        "sound/T-2.ogg",
         "sound/a.ogg",
         "sound/r.ogg",
         "sound/k.ogg",
@@ -162,4 +163,22 @@ pub fn configure_loading(app: &mut App) {
     npcs::configure_npcs(app);
     spellbook::configure_book_asset(app);
     loading::configure_loading(app);
+}
+
+#[wasm_bindgen(start)]
+pub fn wasm_main() {
+    let mut app = App::new();
+    app.add_plugins(DefaultPlugins.set(WindowPlugin {
+        primary_window: Some(Window {
+            title: "Runic Ascendancy".into(),
+            resolution: bevy::window::WindowResolution::new(1280_u32, 960_u32),
+            canvas: Some("#bevy".into()),
+            ..default()
+        }),
+        ..default()
+    }));
+    configure_app(&mut app);
+    rune_words::battle::configure_battle(&mut app);
+    configure_loading(&mut app);
+    app.run();
 }

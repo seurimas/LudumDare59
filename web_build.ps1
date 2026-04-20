@@ -25,4 +25,10 @@ Copy-Item "assets" "$dist\assets" -Recurse
 Copy-Item "web\index.html" "$dist\index.html"
 
 Write-Host "Web build complete in $dist/"
+
+# Zip the web build
+$zip = "RunicAscendancy_LD59_web.zip"
+if (Test-Path $zip) { Remove-Item $zip }
+Compress-Archive -Path "$dist/*" -DestinationPath $zip
+Write-Host "Web zip created: $zip"
 Write-Host "Serve it with: python -m http.server -d $dist"
