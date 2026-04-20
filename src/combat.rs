@@ -22,6 +22,7 @@ use crate::ui::effects::EffectsQueue;
 use crate::ui::spell_selection::SpellSelection;
 
 const NPC_SPAWN_DELAY: f32 = 0.5;
+const SENTENCE_PRE_DELAY: f32 = 0.75;
 
 /// Futhark sentence played on game start (before first NPC spawn).
 const SENTENCE_GAME_START: &str = "runik Asendensi";
@@ -36,6 +37,10 @@ pub struct NpcSpawnTimer {
     pub remaining: f32,
     pub active: bool,
     pub sentence_played: bool,
+    /// Short pause before the sentence plays (avoids bleeding into prior audio).
+    pub pre_delay: f32,
+    /// When true, skip the game-start sentence (e.g. after a binding-failed escape sentence).
+    pub skip_sentence: bool,
 }
 
 /// Raised to signal the start of a fresh combat. Consumers reset per-combat
@@ -50,6 +55,8 @@ pub fn configure_combat(app: &mut App) {
         remaining: NPC_SPAWN_DELAY,
         active: false,
         sentence_played: false,
+        pre_delay: 0.0,
+        skip_sentence: false,
     });
     app.add_systems(
         OnEnter(GameState::Adventure),
@@ -113,6 +120,8 @@ fn reset_adventure_state(
     spawn_timer.remaining = NPC_SPAWN_DELAY;
     spawn_timer.active = false;
     spawn_timer.sentence_played = false;
+    spawn_timer.pre_delay = 0.0;
+    spawn_timer.skip_sentence = false;
 
     // Reset run stats
     run_stats.enemies_defeated = 0;
@@ -406,6 +415,7 @@ fn trigger_victory_on_binding_success(
     tutorial: Option<Res<TutorialState>>,
     mut battle_state: ResMut<BattleState>,
     mut play_letters: MessageWriter<PlayFutharkLetters>,
+    mut npc_spawn_timer: ResMut<NpcSpawnTimer>,
 ) {
     if tutorial.as_ref().is_some_and(|t| t.active) {
         events.clear();
@@ -417,6 +427,7 @@ fn trigger_victory_on_binding_success(
     if battle_state.npc.is_some() {
         battle_state.phase = BattlePhase::Victory;
         play_letters.write(PlayFutharkLetters(SENTENCE_BINDING_SUCCESS.to_string()));
+        npc_spawn_timer.skip_sentence = true;
     }
 }
 
@@ -429,6 +440,7 @@ fn handle_binding_failed(
     mut binding_data: ResMut<BindingData>,
     mut battle_state: ResMut<BattleState>,
     mut play_letters: MessageWriter<PlayFutharkLetters>,
+    mut spawn_timer: ResMut<NpcSpawnTimer>,
 ) {
     if tutorial.as_ref().is_some_and(|t| t.active) {
         events.clear();
@@ -444,6 +456,8 @@ fn handle_binding_failed(
     // NPC dies but no spell selection — go straight to Victory.
     battle_state.phase = BattlePhase::Victory;
     play_letters.write(PlayFutharkLetters(SENTENCE_BINDING_FAILED.to_string()));
+    // Tell the spawn timer to skip the game-start sentence (escape sentence is enough).
+    spawn_timer.skip_sentence = true;
 }
 
 /// When there is no NPC and phase is Idle, play a sentence then spawn a
@@ -483,6 +497,7 @@ fn tick_npc_spawn_timer(
         spawn_timer.remaining = NPC_SPAWN_DELAY;
         spawn_timer.active = true;
         spawn_timer.sentence_played = false;
+        spawn_timer.pre_delay = SENTENCE_PRE_DELAY;
     }
 
     // Wait for any prior audio (e.g. binding success/failure sentence) to finish
@@ -490,11 +505,20 @@ fn tick_npc_spawn_timer(
         return;
     }
 
-    // Play the sentence once when the timer starts
+    // Short pause before starting the sentence so it doesn't bleed into prior audio
+    if spawn_timer.pre_delay > 0.0 {
+        spawn_timer.pre_delay -= time.delta_secs();
+        return;
+    }
+
+    // Play the sentence once (skip if the escape sentence already played)
     if !spawn_timer.sentence_played {
         spawn_timer.sentence_played = true;
-        play_letters.write(PlayFutharkLetters(SENTENCE_GAME_START.to_string()));
-        return;
+        if !spawn_timer.skip_sentence {
+            play_letters.write(PlayFutharkLetters(SENTENCE_GAME_START.to_string()));
+            return;
+        }
+        spawn_timer.skip_sentence = false;
     }
 
     spawn_timer.remaining -= time.delta_secs();
