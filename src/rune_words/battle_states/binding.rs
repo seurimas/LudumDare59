@@ -30,6 +30,8 @@ pub struct BindingData {
     pub attempts_remaining: u32,
     /// Rune letters eliminated in a previous binding attempt, to be restored on re-entry.
     pub persisted_eliminations: HashSet<char>,
+    /// When true, the next binding attempt auto-succeeds (e.g. from Curse).
+    pub guaranteed: bool,
     pending_eliminations_by_row: HashMap<u32, HashSet<char>>,
 }
 
@@ -93,6 +95,7 @@ fn start_binding(
     mut active_slot: ResMut<ActiveRuneSlot>,
     eliminated_keys: Option<ResMut<crate::futhark::EliminatedFutharkKeys>>,
     row_slot_container: Query<Entity, With<RuneSlotRow>>,
+    mut succeeded: MessageWriter<BindingSucceeded>,
 ) {
     let Some(game_assets) = game_assets else {
         return;
@@ -100,6 +103,16 @@ fn start_binding(
     let Some(StartBinding(maybe_target)) = start_events.read().last().cloned() else {
         return;
     };
+
+    // If binding is guaranteed (e.g. from Curse), skip directly to success.
+    if binding_data.guaranteed {
+        binding_data.guaranteed = false;
+        reset_battle_state(&mut commands, &mut battle_state, existing_rows.iter());
+        battle_state.phase = BattlePhase::Idle;
+        active_slot.entity = None;
+        succeeded.write(BindingSucceeded);
+        return;
+    }
 
     // Use the event's target if provided; otherwise fall back to the pre-set target.
     if let Some(t) = maybe_target {

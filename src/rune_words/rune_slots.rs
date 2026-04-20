@@ -101,6 +101,12 @@ pub struct WordAudioQueue {
     current_duration: f32,
 }
 
+impl WordAudioQueue {
+    pub fn is_playing(&self) -> bool {
+        !self.pending.is_empty() || self.elapsed < self.current_duration
+    }
+}
+
 #[derive(Resource, Default)]
 pub struct QueuedTypedInput {
     queued: VecDeque<char>,

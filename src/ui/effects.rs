@@ -24,6 +24,7 @@ const SHAKE_INTENSITY: f32 = 4.0;
 struct QueuedEffect {
     effect: SpellEffect,
     buff_total: i32,
+    prior_word: Option<String>,
 }
 
 /// Resource holding the queue of effects to animate sequentially.
@@ -32,6 +33,8 @@ pub struct EffectsQueue {
     queue: Vec<QueuedEffect>,
     active: Option<ActiveEffect>,
     buff_total: i32,
+    /// The word from the previous successful cast (for ZDamage/TDamage checks).
+    pub prior_word: Option<String>,
 }
 
 impl EffectsQueue {
@@ -45,6 +48,7 @@ struct ActiveEffect {
     effect: SpellEffect,
     elapsed: f32,
     spawned_visual: bool,
+    prior_word: Option<String>,
 }
 
 /// Floating text entity (damage number / stun label).
@@ -128,9 +132,18 @@ fn enqueue_effects_on_success(
             .map(|p| p.attack_buffs.iter().map(|b| b.value).sum())
             .unwrap_or(0);
 
+        let prior_word = queue.prior_word.clone();
+
         for effect in effects {
-            queue.queue.push(QueuedEffect { effect, buff_total });
+            queue.queue.push(QueuedEffect {
+                effect,
+                buff_total,
+                prior_word: prior_word.clone(),
+            });
         }
+
+        // Update prior word to the current word for next cast
+        queue.prior_word = Some(word.clone());
     }
 }
 
@@ -145,6 +158,7 @@ fn process_effect_queue(
     npc_sprite_query: Query<Entity, With<NpcSprite>>,
     arena_query: Query<Entity, With<ArenaPanel>>,
     game_assets: Option<Res<GameAssets>>,
+    mut binding_data: ResMut<crate::rune_words::battle_states::binding::BindingData>,
 ) {
     let dt = time.delta_secs();
 
@@ -266,6 +280,98 @@ fn process_effect_queue(
                             .unwrap_or_default(),
                     );
                 }
+                SpellEffect::FullDamage { amount } => {
+                    // Double damage if target is at full health
+                    let npc_full = npcs.iter().any(|npc| npc.hp == npc.max);
+                    let multiplier = if npc_full { 2 } else { 1 };
+                    let effective =
+                        (*amount as i32 * multiplier as i32 + buff_total).max(0) as u32;
+                    for mut npc in &mut npcs {
+                        npc.hp = npc.hp.saturating_sub(effective);
+                    }
+                    let label = if npc_full {
+                        format!("{}!!", effective)
+                    } else {
+                        format!("{}", effective)
+                    };
+                    spawn_floating_text(
+                        &mut commands,
+                        arena_entity,
+                        &label,
+                        BLOOD_BRIGHT,
+                        font,
+                        24.0,
+                    );
+                }
+                SpellEffect::ZDamage { amount } => {
+                    // Double damage if the prior word had a z sound
+                    let has_z = active
+                        .prior_word
+                        .as_ref()
+                        .map(|w| w.contains('z') || w.contains('Z'))
+                        .unwrap_or(false);
+                    let multiplier = if has_z { 2 } else { 1 };
+                    let effective =
+                        (*amount as i32 * multiplier as i32 + buff_total).max(0) as u32;
+                    for mut npc in &mut npcs {
+                        npc.hp = npc.hp.saturating_sub(effective);
+                    }
+                    let label = if has_z {
+                        format!("{}!!", effective)
+                    } else {
+                        format!("{}", effective)
+                    };
+                    spawn_floating_text(
+                        &mut commands,
+                        arena_entity,
+                        &label,
+                        BLOOD_BRIGHT,
+                        font,
+                        24.0,
+                    );
+                }
+                SpellEffect::TDamage { amount } => {
+                    // Double damage if the prior word had a t sound
+                    let has_t = active
+                        .prior_word
+                        .as_ref()
+                        .map(|w| w.contains('t') || w.contains('T'))
+                        .unwrap_or(false);
+                    let multiplier = if has_t { 2 } else { 1 };
+                    let effective =
+                        (*amount as i32 * multiplier as i32 + buff_total).max(0) as u32;
+                    for mut npc in &mut npcs {
+                        npc.hp = npc.hp.saturating_sub(effective);
+                    }
+                    let label = if has_t {
+                        format!("{}!!", effective)
+                    } else {
+                        format!("{}", effective)
+                    };
+                    spawn_floating_text(
+                        &mut commands,
+                        arena_entity,
+                        &label,
+                        BLOOD_BRIGHT,
+                        font,
+                        24.0,
+                    );
+                }
+                SpellEffect::Curse => {
+                    // Instantly kill the target and guarantee binding success
+                    for mut npc in &mut npcs {
+                        npc.hp = 0;
+                    }
+                    binding_data.guaranteed = true;
+                    spawn_floating_text(
+                        &mut commands,
+                        arena_entity,
+                        "CURSED",
+                        Color::srgb(0.6, 0.0, 0.8),
+                        font,
+                        24.0,
+                    );
+                }
             }
         }
 
@@ -283,6 +389,7 @@ fn process_effect_queue(
             effect: queued.effect,
             elapsed: 0.0,
             spawned_visual: false,
+            prior_word: queued.prior_word,
         });
     } else {
         // Queue fully drained — restart acting if we were mid-combat

@@ -298,5 +298,71 @@
                 "amount": 40
             }
         ]
+    },
+    {
+        "word": "ambush",
+        "starter": true,
+        "futharkation": "ambuS",
+        "effects": [
+            {
+                "type": "full_damage",
+                "amount": 15
+            }
+        ]
+    },
+    {
+        "word": "backstab",
+        "starter": true,
+        "futharkation": "bakstab",
+        "effects": [
+            {
+                "type": "full_damage",
+                "amount": 20
+            }
+        ]
+    },
+    {
+        "word": "whack",
+        "starter": true,
+        "futharkation": "uak",
+        "effects": [
+            {
+                "type": "full_damage",
+                "amount": 10
+            },
+            {
+                "type": "stun",
+                "amount": 1.0
+            }
+        ]
+    },
+    {
+        "word": "syzygy",
+        "futharkation": "sizigi",
+        "effects": [
+            {
+                "type": "z_damage",
+                "amount": 18
+            }
+        ]
+    },
+    {
+        "word": "thought",
+        "futharkation": "Tot",
+        "effects": [
+            {
+                "type": "t_damage",
+                "amount": 18
+            }
+        ]
+    },
+    {
+        "word": "curse",
+        "futharkation": "kurse",
+        "effects": [
+            {
+                "type": "curse"
+            }
+        ]
     }
 ]

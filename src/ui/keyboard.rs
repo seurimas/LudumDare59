@@ -254,15 +254,15 @@ struct KeyMetrics {
 }
 
 const PARENTED_METRICS: KeyMetrics = KeyMetrics {
-    key_width: Val::Percent(8.0),
+    key_width: Val::Percent(9.0),
     key_height: Val::Auto,
     key_aspect_ratio: Some(1.0),
     wide_key_width: Val::Percent(13.3),
     wide_key_height: Val::Auto,
     wide_key_aspect_ratio: Some(80.0 / 48.0),
     column_gap: Val::Percent(0.6),
-    row_gap: Val::Percent(1.2),
-    rune_size: Val::Percent(67.0),
+    row_gap: Val::Percent(1.4),
+    rune_size: Val::Percent(70.0),
     rune_aspect_ratio: Some(1.0),
     letter_font_size: 16.0,
     panel_padding: UiRect::all(Val::Percent(2.0)),
@@ -366,15 +366,6 @@ pub fn spawn_futhark_keyboard(
                     },
                     TextColor(GOLD_LIGHT),
                 ));
-                header.spawn((
-                    Text::new("tab · legend"),
-                    TextFont {
-                        font: header_aside_font,
-                        font_size: metrics.header_aside_font_size,
-                        ..default()
-                    },
-                    TextColor(PARCHMENT_DARK),
-                ));
             });
 
         panel
@@ -399,17 +390,6 @@ pub fn spawn_futhark_keyboard(
                             ..default()
                         })
                         .with_children(|row_parent| {
-                            if row_index == 0 {
-                                spawn_action_key(
-                                    row_parent,
-                                    &game_assets,
-                                    &metrics,
-                                    SPRITE_TAB_ACTION,
-                                    FutharkKeyboardCommandType::ToggleLegendMode,
-                                    true,
-                                );
-                            }
-
                             for &index in row {
                                 if index == usize::MAX {
                                     row_parent.spawn(Node {

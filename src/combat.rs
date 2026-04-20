@@ -17,16 +17,25 @@ use crate::rune_words::battle_states::binding::{
 };
 use crate::spellbook::{Book, LearnedSpells};
 use crate::tutorial::TutorialState;
+use crate::rune_words::rune_slots::{PlayFutharkLetters, WordAudioQueue};
 use crate::ui::effects::EffectsQueue;
 use crate::ui::spell_selection::SpellSelection;
 
-const NPC_SPAWN_DELAY: f32 = 5.0;
+const NPC_SPAWN_DELAY: f32 = 0.5;
+
+/// Futhark sentence played on game start (before first NPC spawn).
+const SENTENCE_GAME_START: &str = "runik Asendensi";
+/// Futhark sentence played on successful binding.
+const SENTENCE_BINDING_SUCCESS: &str = "Te ar baund";
+/// Futhark sentence played on unsuccessful binding.
+const SENTENCE_BINDING_FAILED: &str = "Ter sol haz eskapt";
 
 /// Timer that counts down before a new NPC is spawned.
 #[derive(Resource)]
 pub struct NpcSpawnTimer {
     pub remaining: f32,
     pub active: bool,
+    pub sentence_played: bool,
 }
 
 /// Raised to signal the start of a fresh combat. Consumers reset per-combat
@@ -40,6 +49,7 @@ pub fn configure_combat(app: &mut App) {
     app.insert_resource(NpcSpawnTimer {
         remaining: NPC_SPAWN_DELAY,
         active: false,
+        sentence_played: false,
     });
     app.add_systems(
         OnEnter(GameState::Adventure),
@@ -102,6 +112,7 @@ fn reset_adventure_state(
     // Reset NPC spawn timer
     spawn_timer.remaining = NPC_SPAWN_DELAY;
     spawn_timer.active = false;
+    spawn_timer.sentence_played = false;
 
     // Reset run stats
     run_stats.enemies_defeated = 0;
@@ -150,13 +161,19 @@ fn reset_player_deck_on_battle_start(
     let Some(book) = books.get(&game_assets.spellbook) else {
         return;
     };
-    let known: Vec<_> = learned
-        .filter_spells(book.spells())
-        .into_iter()
-        .cloned()
-        .collect();
+    // Only do a full reset on the very first battle (empty deck+hand+discard).
+    // Subsequent battles keep the player's hand and deck intact, just draw up.
     let mut rng = rand::thread_rng();
-    player.reset_for_new_combat(&known, &mut rng);
+    if player.deck.is_empty() && player.hand.is_empty() && player.discard.is_empty() {
+        let known: Vec<_> = learned
+            .filter_spells(book.spells())
+            .into_iter()
+            .cloned()
+            .collect();
+        player.reset_for_new_combat(&known, &mut rng);
+    } else {
+        player.draw_up_to(crate::health::STARTING_HAND_SIZE, &mut rng);
+    }
 }
 
 fn tick_npc_attacks(
@@ -383,6 +400,7 @@ fn trigger_victory_on_binding_success(
     mut events: MessageReader<BindingSucceeded>,
     tutorial: Option<Res<TutorialState>>,
     mut battle_state: ResMut<BattleState>,
+    mut play_letters: MessageWriter<PlayFutharkLetters>,
 ) {
     if tutorial.as_ref().is_some_and(|t| t.active) {
         events.clear();
@@ -393,18 +411,19 @@ fn trigger_victory_on_binding_success(
     }
     if battle_state.npc.is_some() {
         battle_state.phase = BattlePhase::Victory;
+        play_letters.write(PlayFutharkLetters(SENTENCE_BINDING_SUCCESS.to_string()));
     }
 }
 
-/// When binding fails the NPC recovers half its max HP and returns to acting.
+/// When binding fails the NPC dies but the player does not get to select a spell.
 /// Eliminated runes are remembered for the next binding attempt.
 fn handle_binding_failed(
     mut events: MessageReader<BindingFailed>,
     tutorial: Option<Res<TutorialState>>,
-    mut npcs: Query<&mut NpcCombatState>,
     eliminated_keys: Option<Res<crate::futhark::EliminatedFutharkKeys>>,
     mut binding_data: ResMut<BindingData>,
-    mut start_acting: MessageWriter<StartActing>,
+    mut battle_state: ResMut<BattleState>,
+    mut play_letters: MessageWriter<PlayFutharkLetters>,
 ) {
     if tutorial.as_ref().is_some_and(|t| t.active) {
         events.clear();
@@ -417,15 +436,12 @@ fn handle_binding_failed(
     if let Some(keys) = eliminated_keys {
         binding_data.persisted_eliminations = keys.snapshot();
     }
-    // Give the NPC half its max HP back.
-    for mut npc in &mut npcs {
-        npc.hp = npc.max / 2;
-    }
-    // Return to Acting phase.
-    start_acting.write(StartActing);
+    // NPC dies but no spell selection — go straight to Victory.
+    battle_state.phase = BattlePhase::Victory;
+    play_letters.write(PlayFutharkLetters(SENTENCE_BINDING_FAILED.to_string()));
 }
 
-/// When there is no NPC and phase is Idle, count down a timer and then spawn a
+/// When there is no NPC and phase is Idle, play a sentence then spawn a
 /// random NPC to start a new battle.
 fn tick_npc_spawn_timer(
     time: Res<Time>,
@@ -435,8 +451,10 @@ fn tick_npc_spawn_timer(
     game_assets: Option<Res<GameAssets>>,
     npc_specs: Res<Assets<NpcSpec>>,
     spell_selection: Res<SpellSelection>,
+    audio_queue: Res<WordAudioQueue>,
     mut battle_start: MessageWriter<BattleStart>,
     mut start_acting: MessageWriter<StartActing>,
+    mut play_letters: MessageWriter<PlayFutharkLetters>,
 ) {
     if tutorial.as_ref().is_some_and(|t| t.active) {
         return;
@@ -444,6 +462,7 @@ fn tick_npc_spawn_timer(
 
     if spell_selection.is_open() {
         spawn_timer.active = false;
+        spawn_timer.sentence_played = false;
         return;
     }
 
@@ -451,12 +470,25 @@ fn tick_npc_spawn_timer(
 
     if !npc_gone {
         spawn_timer.active = false;
+        spawn_timer.sentence_played = false;
         return;
     }
 
     if !spawn_timer.active {
         spawn_timer.remaining = NPC_SPAWN_DELAY;
         spawn_timer.active = true;
+        spawn_timer.sentence_played = false;
+    }
+
+    // Play the sentence once when the timer starts
+    if !spawn_timer.sentence_played {
+        spawn_timer.sentence_played = true;
+        play_letters.write(PlayFutharkLetters(SENTENCE_GAME_START.to_string()));
+    }
+
+    // Wait for the audio to finish before counting down
+    if audio_queue.is_playing() {
+        return;
     }
 
     spawn_timer.remaining -= time.delta_secs();
@@ -465,6 +497,7 @@ fn tick_npc_spawn_timer(
     }
 
     spawn_timer.active = false;
+    spawn_timer.sentence_played = false;
 
     let Some(game_assets) = game_assets else {
         return;

@@ -13,6 +13,17 @@ pub enum SpellEffect {
     Shield { amount: u32, duration: f32 },
     Buff { amount: i32, duration: f32 },
     Binding { amount: u32 },
+    /// Double damage if target is at full health.
+    #[serde(rename = "fulldamage")]
+    FullDamage { amount: u32 },
+    /// Double damage if the prior word had a z sound in it.
+    #[serde(rename = "zdamage")]
+    ZDamage { amount: u32 },
+    /// Double damage if the prior word had a t sound in it.
+    #[serde(rename = "tdamage")]
+    TDamage { amount: u32 },
+    /// Instantly kills the target with guaranteed binding; runes are hidden.
+    Curse,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
