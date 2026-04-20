@@ -306,29 +306,27 @@
         "effects": [
             {
                 "type": "fulldamage",
-                "amount": 15
+                "amount": 5
             }
         ]
     },
     {
         "word": "backstab",
-        "starter": true,
         "futharkation": "bakstab",
         "effects": [
             {
                 "type": "fulldamage",
-                "amount": 20
+                "amount": 8
             }
         ]
     },
     {
         "word": "whack",
-        "starter": true,
         "futharkation": "uak",
         "effects": [
             {
                 "type": "fulldamage",
-                "amount": 10
+                "amount": 4
             },
             {
                 "type": "stun",
@@ -342,7 +340,7 @@
         "effects": [
             {
                 "type": "zdamage",
-                "amount": 18
+                "amount": 12
             }
         ]
     },
@@ -352,7 +350,7 @@
         "effects": [
             {
                 "type": "tdamage",
-                "amount": 18
+                "amount": 9
             }
         ]
     },

@@ -4,6 +4,7 @@ use crate::GameAssets;
 use crate::GameState;
 use crate::futhark::{SPRITE_RUNE_OFFSET, letter_to_index};
 use crate::health::PlayerCombatState;
+use crate::rune_words::battle::{BattlePhase, BattleState};
 use crate::spellbook::SpellEffect;
 use crate::ui::clock::BattleUiClock;
 use crate::ui::hud_root::BookPanel;
@@ -45,6 +46,10 @@ struct SpellEntryEffectsRow {
     index: usize,
 }
 
+/// Overlay shown instead of the book content during binding phase.
+#[derive(Component)]
+struct BindingBookOverlay;
+
 // ─── Configure ────────────────────────────────────────────────────────────────
 
 pub fn configure_book(app: &mut App) {
@@ -59,6 +64,10 @@ pub fn configure_book(app: &mut App) {
     app.add_systems(
         Update,
         pulse_active_pointer.run_if(in_state(GameState::Adventure)),
+    );
+    app.add_systems(
+        Update,
+        toggle_book_binding_overlay.run_if(in_state(GameState::Adventure)),
     );
 }
 
@@ -528,6 +537,72 @@ fn effect_labels(effect: &SpellEffect) -> Vec<String> {
 // ─── Active pointer pulse ─────────────────────────────────────────────────────
 
 /// Marker for the `☛` pointer node shown beside the active spell entry.
+// ─── Binding overlay ──────────────────────────────────────────────────────────
+
+fn toggle_book_binding_overlay(
+    mut commands: Commands,
+    battle_state: Res<BattleState>,
+    game_assets: Option<Res<GameAssets>>,
+    book_panel: Query<Entity, With<BookPanel>>,
+    mut page_query: Query<&mut Node, With<BookPage>>,
+    existing_overlay: Query<Entity, With<BindingBookOverlay>>,
+) {
+    let is_binding = matches!(battle_state.phase, BattlePhase::Binding);
+
+    let has_overlay = !existing_overlay.is_empty();
+    if is_binding == has_overlay {
+        return;
+    }
+
+    if is_binding {
+        // Hide the BookPage content.
+        for mut node in &mut page_query {
+            node.display = Display::None;
+        }
+
+        // Spawn overlay inside the BookPanel.
+        let Ok(panel) = book_panel.single() else {
+            return;
+        };
+        let Some(game_assets) = game_assets else {
+            return;
+        };
+        let font = game_assets.font_cormorant_unicase_semibold.clone();
+
+        commands.entity(panel).with_children(|panel| {
+            panel
+                .spawn((
+                    BindingBookOverlay,
+                    Node {
+                        flex_grow: 1.0,
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        ..default()
+                    },
+                ))
+                .with_children(|overlay| {
+                    overlay.spawn((
+                        Text::new("Find the Binding Word"),
+                        TextFont {
+                            font,
+                            font_size: 18.0,
+                            ..default()
+                        },
+                        TextColor(GOLD_LIGHT),
+                    ));
+                });
+        });
+    } else {
+        // Remove overlay and restore the BookPage.
+        for entity in &existing_overlay {
+            commands.entity(entity).despawn();
+        }
+        for mut node in &mut page_query {
+            node.display = Display::Flex;
+        }
+    }
+}
+
 #[derive(Component)]
 struct ActiveSpellPointer;
 

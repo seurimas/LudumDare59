@@ -266,7 +266,7 @@ const PARENTED_METRICS: KeyMetrics = KeyMetrics {
     wide_key_aspect_ratio: Some(80.0 / 48.0),
     column_gap: Val::Percent(0.6),
     row_gap: Val::Percent(1.4),
-    rune_size: Val::Percent(70.0),
+    rune_size: Val::Percent(140.0),
     rune_aspect_ratio: Some(1.0),
     letter_font_size: 16.0,
     panel_padding: UiRect::all(Val::Percent(2.0)),

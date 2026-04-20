@@ -96,6 +96,7 @@ fn start_binding(
     eliminated_keys: Option<ResMut<crate::futhark::EliminatedFutharkKeys>>,
     row_slot_container: Query<Entity, With<RuneSlotRow>>,
     mut succeeded: MessageWriter<BindingSucceeded>,
+    npcs: Query<&crate::health::NpcCombatState>,
 ) {
     let Some(game_assets) = game_assets else {
         return;
@@ -108,7 +109,8 @@ fn start_binding(
     if binding_data.guaranteed {
         binding_data.guaranteed = false;
         reset_battle_state(&mut commands, &mut battle_state, existing_rows.iter());
-        battle_state.phase = BattlePhase::Idle;
+        // Set Binding (not Idle) so resume_combat_after_effects won't race.
+        battle_state.phase = BattlePhase::Binding;
         active_slot.entity = None;
         succeeded.write(BindingSucceeded);
         return;
@@ -122,6 +124,11 @@ fn start_binding(
     let Some(target) = binding_data.target.clone() else {
         return;
     };
+
+    // Use the NPC entity's current binding count (includes spell-added bindings).
+    for npc in &npcs {
+        binding_data.attempts_remaining = npc.bindings;
+    }
 
     reset_battle_state(&mut commands, &mut battle_state, existing_rows.iter());
     battle_state.phase = BattlePhase::Binding;
@@ -263,6 +270,7 @@ fn on_binding_row_resolved(
     existing_battle_slots: Query<Entity, With<BattleRuneSlot>>,
     row_slot_container: Query<Entity, With<RuneSlotRow>>,
     mut last_graded_word: ResMut<LastGradedWord>,
+    mut npcs: Query<&mut crate::health::NpcCombatState>,
 ) {
     let Some(game_assets) = game_assets else {
         return;
@@ -280,7 +288,9 @@ fn on_binding_row_resolved(
 
     if binding_data.pending_success {
         binding_data.pending_success = false;
-        battle_state.phase = BattlePhase::Idle;
+        // Keep phase as Binding — trigger_victory_on_binding_success will
+        // transition to Victory next frame. Setting Idle here would let
+        // resume_combat_after_effects race and restart binding.
         active_slot.entity = None;
         succeeded.write(BindingSucceeded);
         return;
@@ -289,6 +299,9 @@ fn on_binding_row_resolved(
     // Failure path: track attempts if a limit is set.
     if binding_data.attempts_remaining > 0 {
         binding_data.attempts_remaining -= 1;
+        for mut npc in &mut npcs {
+            npc.bindings = npc.bindings.saturating_sub(1);
+        }
         if binding_data.attempts_remaining == 0 {
             // All attempts exhausted.
             for entity in existing_battle_slots.iter() {
@@ -600,7 +613,7 @@ mod tests {
     }
 
     #[test]
-    fn binding_success_transitions_to_idle_and_spawns_no_new_row() {
+    fn binding_success_stays_binding_and_spawns_no_new_row() {
         let mut app = make_test_app();
         app.world_mut()
             .write_message(StartBinding(Some(dictionary::Futharkation {
@@ -613,18 +626,16 @@ mod tests {
         app.world_mut().write_message(EnterActiveRuneWord);
         app.update();
 
+        // Tick until grading animation finishes.
         for _ in 0..30 {
-            if app.world().resource::<BattleState>().phase == BattlePhase::Idle {
-                break;
-            }
             app.update();
         }
 
         let state = app.world().resource::<BattleState>();
         assert_eq!(
             state.phase,
-            BattlePhase::Idle,
-            "phase should be Idle after binding success"
+            BattlePhase::Binding,
+            "phase should stay Binding after success (combat.rs promotes to Victory)"
         );
         assert!(
             state.active_row_slots.is_empty(),

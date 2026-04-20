@@ -29,7 +29,7 @@ const SENTENCE_GAME_START: &str = "runik Asendensi";
 /// Futhark sentence played on successful binding.
 const SENTENCE_BINDING_SUCCESS: &str = "Te ar baund";
 /// Futhark sentence played on unsuccessful binding.
-const SENTENCE_BINDING_FAILED: &str = "Ter sol haz eskapt";
+const SENTENCE_BINDING_FAILED: &str = "no Ter sul haz eskapt";
 
 /// Timer that counts down before a new NPC is spawned.
 #[derive(Resource)]
@@ -66,6 +66,7 @@ pub fn configure_combat(app: &mut App) {
         Update,
         (
             tick_npc_attacks,
+            tick_player_effects,
             apply_npc_damage_to_player,
             reset_player_deck_on_battle_start,
             setup_binding_target_on_battle_start,
@@ -312,7 +313,6 @@ fn setup_binding_target_on_battle_start(
     match dictionary::futharkation_from_word(word) {
         Ok(futharkation) => {
             binding_data.target = Some(futharkation);
-            binding_data.attempts_remaining = spec.minimum_bindings;
         }
         Err(e) => {
             bevy::log::warn!("Could not futharkate binding word '{}': {}", word, e);
@@ -545,4 +545,8 @@ fn tick_npc_spawn_timer(
     battle_state.npc = Some(spec.clone());
     battle_start.write(BattleStart);
     start_acting.write(StartActing);
+}
+
+fn tick_player_effects(time: Res<Time>, mut player: ResMut<PlayerCombatState>) {
+    player.tick(time.delta_secs());
 }

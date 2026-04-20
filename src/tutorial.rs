@@ -517,7 +517,7 @@ fn tutorial_step_config(step: TutorialStep) -> (&'static str, bool, HighlightTar
         ),
         TutorialStep::AttackPhase => ("Finish your foe!", false, HighlightTarget::None),
         TutorialStep::BindingPhase => (
-            "You must bind this spirit away by divining their binding word. Use your runes to sound it out. If you fail, the creature will receive a burst of energy and rise to fight again.",
+            "You must bind this spirit away by divining their binding word. Use your runes to sound it out. If you succeed, you will earn a new spell for your spellbook!",
             false,
             HighlightTarget::RuneWordAndBinding,
         ),

@@ -6,6 +6,7 @@ use crate::dictionary;
 use crate::futhark::EliminatedFutharkKeys;
 use crate::health::NpcCombatState;
 use crate::rune_words::battle::{BattlePhase, BattleState};
+use crate::tutorial::TutorialState;
 use crate::ui::hud_root::BindingPanel;
 use crate::ui::palette::*;
 
@@ -294,6 +295,7 @@ fn sync_binding_panel(
     >,
     mut panel_state: ResMut<BindingPanelState>,
     eliminated_keys: Option<Res<EliminatedFutharkKeys>>,
+    tutorial: Option<Res<TutorialState>>,
 ) {
     let Some(game_assets) = game_assets else {
         return;
@@ -379,12 +381,17 @@ fn sync_binding_panel(
     }
 
     if is_binding_phase {
-        // Get binding words from the NPC spec.
-        let binding_words: Vec<String> = battle_state
-            .npc
-            .as_ref()
-            .map(|spec| spec.binding_words.clone())
-            .unwrap_or_default();
+        // During tutorial, override the binding word list to only show "ash".
+        let is_tutorial = tutorial.as_ref().is_some_and(|t| t.active);
+        let binding_words: Vec<String> = if is_tutorial {
+            vec![crate::tutorial::TUTORIAL_BINDING_WORD.to_string()]
+        } else {
+            battle_state
+                .npc
+                .as_ref()
+                .map(|spec| spec.binding_words.clone())
+                .unwrap_or_default()
+        };
 
         // Cache futharkations if not yet computed for these words.
         if panel_state.cached_futharkations.is_empty()

@@ -1,7 +1,7 @@
 {
   "max_health": 20,
   "health_growth": 5,
-  "minimum_bindings": 1,
+  "minimum_bindings": 2,
   "binding_words": [
     "abbate",
     "agate",

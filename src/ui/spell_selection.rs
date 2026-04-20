@@ -459,15 +459,38 @@ fn handle_selection_click(
     skip: Query<&Interaction, (Changed<Interaction>, With<Button>, With<SpellSelectionSkip>)>,
     mut learned: ResMut<LearnedSpells>,
     mut selection: ResMut<SpellSelection>,
+    mut player: ResMut<crate::health::PlayerCombatState>,
+    game_assets: Option<Res<GameAssets>>,
+    books: Res<Assets<Book>>,
 ) {
     for (interaction, choice) in &choices {
         if *interaction == Interaction::Pressed {
             match choice.mode {
                 SelectionMode::Learn | SelectionMode::Relearn => {
                     learned.insert(choice.word.clone());
+                    // Also add the SpellDef to the player's deck pile so it
+                    // actually enters the card pool for the current run.
+                    if let Some(ref ga) = game_assets {
+                        if let Some(book) = books.get(&ga.spellbook) {
+                            if let Some(spell) =
+                                book.spells().iter().find(|s| s.word == choice.word)
+                            {
+                                player.deck.push(spell.clone());
+                            }
+                        }
+                    }
                 }
                 SelectionMode::Unlearn => {
                     learned.remove_one(&choice.word);
+                    // Remove one copy from the card pool (discard → deck → hand).
+                    let w = &choice.word;
+                    if let Some(i) = player.discard.iter().position(|c| c.word == *w) {
+                        player.discard.remove(i);
+                    } else if let Some(i) = player.deck.iter().position(|c| c.word == *w) {
+                        player.deck.remove(i);
+                    } else if let Some(i) = player.hand.iter().position(|c| c.word == *w) {
+                        player.hand.remove(i);
+                    }
                 }
             }
             selection.close();
