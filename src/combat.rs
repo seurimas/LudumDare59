@@ -15,9 +15,9 @@ use crate::rune_words::battle_states::acting::StartActing;
 use crate::rune_words::battle_states::binding::{
     BindingData, BindingFailed, BindingSucceeded, StartBinding,
 };
+use crate::rune_words::rune_slots::{PlayFutharkLetters, WordAudioQueue};
 use crate::spellbook::{Book, LearnedSpells};
 use crate::tutorial::TutorialState;
-use crate::rune_words::rune_slots::{PlayFutharkLetters, WordAudioQueue};
 use crate::ui::effects::EffectsQueue;
 use crate::ui::spell_selection::SpellSelection;
 

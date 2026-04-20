@@ -131,6 +131,10 @@ impl EliminatedFutharkKeys {
         self.letters.insert(letter);
     }
 
+    pub fn len(&self) -> usize {
+        self.letters.len()
+    }
+
     pub fn snapshot(&self) -> HashSet<char> {
         self.letters.clone()
     }

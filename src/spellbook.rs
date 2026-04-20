@@ -8,20 +8,38 @@ use crate::dictionary;
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum SpellEffect {
-    Damage { amount: u32 },
-    Stun { amount: f32 },
-    Shield { amount: u32, duration: f32 },
-    Buff { amount: i32, duration: f32 },
-    Binding { amount: u32 },
+    Damage {
+        amount: u32,
+    },
+    Stun {
+        amount: f32,
+    },
+    Shield {
+        amount: u32,
+        duration: f32,
+    },
+    Buff {
+        amount: i32,
+        duration: f32,
+    },
+    Binding {
+        amount: u32,
+    },
     /// Double damage if target is at full health.
     #[serde(rename = "fulldamage")]
-    FullDamage { amount: u32 },
+    FullDamage {
+        amount: u32,
+    },
     /// Double damage if the prior word had a z sound in it.
     #[serde(rename = "zdamage")]
-    ZDamage { amount: u32 },
+    ZDamage {
+        amount: u32,
+    },
     /// Double damage if the prior word had a t sound in it.
     #[serde(rename = "tdamage")]
-    TDamage { amount: u32 },
+    TDamage {
+        amount: u32,
+    },
     /// Instantly kills the target with guaranteed binding; runes are hidden.
     Curse,
 }

@@ -284,8 +284,7 @@ fn process_effect_queue(
                     // Double damage if target is at full health
                     let npc_full = npcs.iter().any(|npc| npc.hp == npc.max);
                     let multiplier = if npc_full { 2 } else { 1 };
-                    let effective =
-                        (*amount as i32 * multiplier as i32 + buff_total).max(0) as u32;
+                    let effective = (*amount as i32 * multiplier as i32 + buff_total).max(0) as u32;
                     for mut npc in &mut npcs {
                         npc.hp = npc.hp.saturating_sub(effective);
                     }
@@ -311,8 +310,7 @@ fn process_effect_queue(
                         .map(|w| w.contains('z') || w.contains('Z'))
                         .unwrap_or(false);
                     let multiplier = if has_z { 2 } else { 1 };
-                    let effective =
-                        (*amount as i32 * multiplier as i32 + buff_total).max(0) as u32;
+                    let effective = (*amount as i32 * multiplier as i32 + buff_total).max(0) as u32;
                     for mut npc in &mut npcs {
                         npc.hp = npc.hp.saturating_sub(effective);
                     }
@@ -338,8 +336,7 @@ fn process_effect_queue(
                         .map(|w| w.contains('t') || w.contains('T'))
                         .unwrap_or(false);
                     let multiplier = if has_t { 2 } else { 1 };
-                    let effective =
-                        (*amount as i32 * multiplier as i32 + buff_total).max(0) as u32;
+                    let effective = (*amount as i32 * multiplier as i32 + buff_total).max(0) as u32;
                     for mut npc in &mut npcs {
                         npc.hp = npc.hp.saturating_sub(effective);
                     }

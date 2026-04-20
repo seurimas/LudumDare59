@@ -2,6 +2,8 @@ use bevy::prelude::*;
 
 use crate::GameAssets;
 use crate::GameState;
+use crate::dictionary;
+use crate::futhark::EliminatedFutharkKeys;
 use crate::health::NpcCombatState;
 use crate::rune_words::battle::{BattlePhase, BattleState};
 use crate::ui::hud_root::BindingPanel;
@@ -53,6 +55,9 @@ struct BindingWordListContainer;
 struct BindingPanelState {
     last_binding_count: u32,
     last_is_binding_phase: bool,
+    last_eliminated_count: usize,
+    /// Cached (word, futhark_letters) for the current NPC's binding words.
+    cached_futharkations: Vec<(String, String)>,
 }
 
 // ─── Configure ────────────────────────────────────────────────────────────────
@@ -288,6 +293,7 @@ fn sync_binding_panel(
         ),
     >,
     mut panel_state: ResMut<BindingPanelState>,
+    eliminated_keys: Option<Res<EliminatedFutharkKeys>>,
 ) {
     let Some(game_assets) = game_assets else {
         return;
@@ -305,14 +311,18 @@ fn sync_binding_panel(
     // Get NPC binding count.
     let binding_count: u32 = npcs.iter().map(|npc| npc.bindings).sum();
 
+    let eliminated_count = eliminated_keys.as_ref().map(|k| k.len()).unwrap_or(0);
+
     // Skip rebuild if nothing changed.
     if binding_count == panel_state.last_binding_count
         && is_binding_phase == panel_state.last_is_binding_phase
+        && eliminated_count == panel_state.last_eliminated_count
     {
         return;
     }
     panel_state.last_binding_count = binding_count;
     panel_state.last_is_binding_phase = is_binding_phase;
+    panel_state.last_eliminated_count = eliminated_count;
 
     // ── Update icons area ────────────────────────────────────────────────────
     // Despawn old icons and rebuild.
@@ -376,9 +386,31 @@ fn sync_binding_panel(
             .map(|spec| spec.binding_words.clone())
             .unwrap_or_default();
 
+        // Cache futharkations if not yet computed for these words.
+        if panel_state.cached_futharkations.is_empty()
+            || panel_state.cached_futharkations.len() != binding_words.len()
+        {
+            panel_state.cached_futharkations = binding_words
+                .iter()
+                .filter_map(|w| {
+                    dictionary::futharkation_from_word(w)
+                        .ok()
+                        .map(|f| (w.clone(), f.letters))
+                })
+                .collect();
+        }
+
         let font = game_assets.font_im_fell_sc.clone();
         commands.entity(word_list_container).with_children(|area| {
-            for word in &binding_words {
+            for (word, futhark_letters) in &panel_state.cached_futharkations {
+                // Hide words that contain any eliminated rune.
+                let is_possible = eliminated_keys.as_ref().map_or(true, |elim| {
+                    !futhark_letters.chars().any(|ch| elim.contains(ch))
+                });
+                if !is_possible {
+                    continue;
+                }
+
                 area.spawn((
                     BindingWordListText,
                     Text::new(word.as_str()),
@@ -398,5 +430,7 @@ fn sync_binding_panel(
                 ));
             }
         });
+    } else {
+        panel_state.cached_futharkations.clear();
     }
 }

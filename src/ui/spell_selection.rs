@@ -502,12 +502,19 @@ fn effect_sprite_index(effect: &SpellEffect) -> usize {
         SpellEffect::Stun { .. } => 248,
         SpellEffect::Buff { .. } => 247,
         SpellEffect::Binding { .. } => 246,
+        SpellEffect::FullDamage { .. } => 245,
+        SpellEffect::ZDamage { .. } => 244,
+        SpellEffect::TDamage { .. } => 243,
+        SpellEffect::Curse => 242,
     }
 }
 
 fn effect_labels(effect: &SpellEffect) -> Vec<String> {
     match effect {
-        SpellEffect::Damage { amount } => vec![format!("{amount}")],
+        SpellEffect::Damage { amount }
+        | SpellEffect::FullDamage { amount }
+        | SpellEffect::ZDamage { amount }
+        | SpellEffect::TDamage { amount } => vec![format!("{amount}")],
         SpellEffect::Stun { amount } => vec![format!("{amount:.0}")],
         SpellEffect::Shield { amount, duration } => {
             vec![format!("{amount}"), format!("{duration:.0}s")]
@@ -516,5 +523,9 @@ fn effect_labels(effect: &SpellEffect) -> Vec<String> {
             vec![format!("{amount}"), format!("{duration:.0}s")]
         }
         SpellEffect::Binding { amount } => vec![format!("{amount}")],
+        SpellEffect::FullDamage { amount } => vec![format!("{amount}(x2)")],
+        SpellEffect::ZDamage { amount } => vec![format!("{amount}(x2)")],
+        SpellEffect::TDamage { amount } => vec![format!("{amount}(x2)")],
+        SpellEffect::Curse => vec!["XXX".to_string()],
     }
 }

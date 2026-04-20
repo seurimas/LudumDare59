@@ -363,6 +363,7 @@ fn sync_book_panel(
     }
 
     // Update rune rows: despawn old glyph sprites, spawn new.
+    let spells_for_runes = first_four_spells(&player.hand);
     for (rune_row_entity, rune_row) in &rune_row_query {
         // Despawn existing glyph children.
         if let Ok(children) = children_query.get(rune_row_entity) {
@@ -374,6 +375,18 @@ fn sync_book_panel(
         let Some(entry) = entries[rune_row.index].as_ref() else {
             continue;
         };
+
+        // Hide runes for Curse spells.
+        let is_curse = spells_for_runes[rune_row.index]
+            .map(|s| {
+                s.effects
+                    .iter()
+                    .any(|e| matches!(e, crate::spellbook::SpellEffect::Curse))
+            })
+            .unwrap_or(false);
+        if is_curse {
+            continue;
+        }
 
         // Spawn one futhark sprite per letter.
         commands.entity(rune_row_entity).with_children(|row| {
@@ -482,17 +495,24 @@ fn first_four_spells(
 
 fn effect_sprite_index(effect: &SpellEffect) -> usize {
     match effect {
-        SpellEffect::Damage { .. } => 250,
+        SpellEffect::Damage { .. }
+        | SpellEffect::FullDamage { .. }
+        | SpellEffect::ZDamage { .. }
+        | SpellEffect::TDamage { .. } => 250,
         SpellEffect::Shield { .. } => 249,
         SpellEffect::Stun { .. } => 248,
         SpellEffect::Buff { .. } => 247,
         SpellEffect::Binding { .. } => 246,
+        SpellEffect::Curse => 250,
     }
 }
 
 fn effect_labels(effect: &SpellEffect) -> Vec<String> {
     match effect {
-        SpellEffect::Damage { amount } => vec![format!("{amount}")],
+        SpellEffect::Damage { amount }
+        | SpellEffect::FullDamage { amount }
+        | SpellEffect::ZDamage { amount }
+        | SpellEffect::TDamage { amount } => vec![format!("{amount}")],
         SpellEffect::Stun { amount } => vec![format!("{amount:.0}")],
         SpellEffect::Shield { amount, duration } => {
             vec![format!("{amount}"), format!("{duration:.0}s")]
@@ -501,6 +521,7 @@ fn effect_labels(effect: &SpellEffect) -> Vec<String> {
             vec![format!("{amount}"), format!("{duration:.0}s")]
         }
         SpellEffect::Binding { amount } => vec![format!("{amount}")],
+        SpellEffect::Curse => vec!["☠".to_string()],
     }
 }
 

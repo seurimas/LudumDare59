@@ -2,9 +2,19 @@ use bevy::prelude::*;
 use rand::seq::SliceRandom;
 use serde::Deserialize;
 
-use crate::spellbook::SpellDef;
+use crate::spellbook::{SpellDef, SpellEffect};
 
 pub const STARTING_HAND_SIZE: usize = 4;
+
+const CURSE_FUTHARKATIONS_RAW: &str = include_str!("../assets/curse.txt");
+
+fn curse_futharkations() -> Vec<&'static str> {
+    CURSE_FUTHARKATIONS_RAW
+        .lines()
+        .map(|l| l.trim())
+        .filter(|l| !l.is_empty())
+        .collect()
+}
 
 #[derive(Resource)]
 pub struct PlayerCombatState {
@@ -105,7 +115,14 @@ impl PlayerCombatState {
                 std::mem::swap(&mut self.deck, &mut self.discard);
                 self.deck.shuffle(rng);
             }
-            if let Some(card) = self.deck.pop() {
+            if let Some(mut card) = self.deck.pop() {
+                // Randomize futharkation for Curse spells
+                if card.effects.iter().any(|e| matches!(e, SpellEffect::Curse)) {
+                    let curses = curse_futharkations();
+                    if let Some(f) = curses.choose(rng) {
+                        card.futharkation = f.to_string();
+                    }
+                }
                 self.hand.push(card);
                 drawn += 1;
             }
