@@ -6,7 +6,7 @@ use crate::health::{NpcAttackState, NpcCombatState, PlayerCombatState};
 use crate::npcs::NpcSpec;
 use crate::rune_words::battle::{BattlePhase, BattleState};
 use crate::rune_words::battle_states::acting::{ActingSucceeded, StartActing};
-use crate::rune_words::battle_states::binding::{BindingSucceeded, StartBinding};
+use crate::rune_words::battle_states::binding::{BindingFailed, BindingSucceeded, StartBinding};
 use crate::spellbook::Book;
 use crate::ui::arena::NpcSprite;
 use crate::ui::hud_root::{BindingPanel, BookPanel, InscribedPanel};
@@ -84,6 +84,7 @@ pub fn configure_tutorial(app: &mut App) {
             handle_tutorial_shield_success,
             handle_tutorial_bop_success,
             handle_tutorial_binding_success,
+            handle_tutorial_binding_failed,
         )
             .chain()
             .run_if(in_state(GameState::Adventure))
@@ -287,6 +288,7 @@ fn handle_tutorial_bop_success(
         // after acting success, so trigger_binding_on_npc_death won't fire).
         for mut npc in &mut npcs {
             npc.hp = 0;
+            npc.bindings += 2;
         }
         tutorial.step = TutorialStep::BindingPhase;
         start_binding.write(StartBinding(None));
@@ -308,6 +310,24 @@ fn handle_tutorial_binding_success(
     }
 
     // Show the final message (advance_tutorial_step handles the actual exit)
+    tutorial.step = TutorialStep::Done;
+    battle_state.phase = BattlePhase::Idle;
+}
+
+fn handle_tutorial_binding_failed(
+    mut events: MessageReader<BindingFailed>,
+    mut tutorial: ResMut<TutorialState>,
+    mut battle_state: ResMut<BattleState>,
+) {
+    if tutorial.step != TutorialStep::BindingPhase {
+        events.clear();
+        return;
+    }
+
+    if events.read().last().is_none() {
+        return;
+    }
+
     tutorial.step = TutorialStep::Done;
     battle_state.phase = BattlePhase::Idle;
 }
@@ -522,7 +542,7 @@ fn tutorial_step_config(step: TutorialStep) -> (&'static str, bool, HighlightTar
             HighlightTarget::RuneWordAndBinding,
         ),
         TutorialStep::Done => (
-            "You have bound the spirit, but more lurk deeper. Are you ready?",
+            "Your trial is complete. More spirits lurk deeper in the forest. Are you ready?",
             true,
             HighlightTarget::None,
         ),
