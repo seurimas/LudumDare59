@@ -19,6 +19,18 @@ pub struct NpcSpec {
     pub minimum_bindings: u32,
 }
 
+impl NpcSpec {
+    /// Modifies this NPC spec to be easier to fight, by reducing health and increasing
+    /// the minimum bindings threshold.
+    pub fn easy_mode(&mut self) {
+        self.max_health = (self.max_health as f32 * 0.75) as u32;
+        self.minimum_bindings = self.minimum_bindings + 1;
+        self.attacks.iter_mut().for_each(|attack| {
+            attack.attack_time = attack.attack_time * 2.0;
+        });
+    }
+}
+
 #[derive(Default, TypePath)]
 pub struct NpcSpecLoader;
 

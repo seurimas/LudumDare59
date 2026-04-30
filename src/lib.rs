@@ -133,6 +133,12 @@ pub fn configure_app(app: &mut App) {
 
     app.add_systems(
         Update,
+        (futhark::sync_keyboard_zoom,)
+            .chain()
+            .run_if(in_state(GameState::Adventure)),
+    );
+    app.add_systems(
+        Update,
         (
             futhark::emit_futhark_keyboard_command_from_clicks,
             futhark::emit_typed_futhark_input_from_keyboard,

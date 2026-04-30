@@ -42,6 +42,11 @@ pub struct NpcSpawnTimer {
     pub skip_sentence: bool,
 }
 
+#[derive(Resource)]
+pub struct EasyMode {
+    pub active: bool,
+}
+
 /// Raised to signal the start of a fresh combat. Consumers reset per-combat
 /// state (deck/hand/discard) when this fires.
 #[derive(bevy::ecs::message::Message, Clone, Copy, Debug, Default)]
@@ -57,6 +62,7 @@ pub fn configure_combat(app: &mut App) {
         pre_delay: 0.0,
         skip_sentence: false,
     });
+    app.insert_resource(EasyMode { active: false });
     app.add_systems(
         OnEnter(GameState::Adventure),
         (reset_adventure_state, reset_learned_spells_to_starters).chain(),
@@ -484,6 +490,7 @@ fn tick_npc_spawn_timer(
     mut battle_start: MessageWriter<BattleStart>,
     mut start_acting: MessageWriter<StartActing>,
     mut play_letters: MessageWriter<PlayFutharkLetters>,
+    easy_mode: Res<EasyMode>,
 ) {
     if tutorial.as_ref().is_some_and(|t| t.active) {
         return;
@@ -551,6 +558,11 @@ fn tick_npc_spawn_timer(
     let Some(spec) = npc_specs.get(chosen_handle) else {
         return;
     };
+
+    let mut spec = spec.clone();
+    if easy_mode.active {
+        spec.easy_mode();
+    }
 
     battle_state.npc = Some(spec.clone());
     battle_start.write(BattleStart);

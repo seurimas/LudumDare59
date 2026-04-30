@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use bevy_aspect_ratio_mask::Hud;
 
 use crate::GameState;
+use crate::combat::EasyMode;
 use crate::tutorial::TutorialState;
 use crate::ui::palette::{GOLD, GOLD_DARK, INK, NIGHT, PARCHMENT, PARCHMENT_WARM};
 
@@ -12,6 +13,9 @@ struct MainMenuRoot;
 struct StartButton;
 
 #[derive(Component)]
+struct EasyModeButton;
+
+#[derive(Component)]
 struct TutorialButton;
 
 pub fn configure_main_menu(app: &mut App) {
@@ -19,7 +23,12 @@ pub fn configure_main_menu(app: &mut App) {
     app.add_systems(OnExit(GameState::MainMenu), despawn_main_menu);
     app.add_systems(
         Update,
-        (handle_start_button, handle_tutorial_button).run_if(in_state(GameState::MainMenu)),
+        (
+            handle_start_button,
+            handle_easy_mode_button,
+            handle_tutorial_button,
+        )
+            .run_if(in_state(GameState::MainMenu)),
     );
 }
 
@@ -90,6 +99,28 @@ fn spawn_main_menu(mut commands: Commands, hud: Res<Hud>, game_assets: Res<crate
                     )],
                 ));
 
+                // Start button
+                menu.spawn((
+                    EasyModeButton,
+                    Button,
+                    Node {
+                        padding: UiRect::axes(Val::Px(48.0), Val::Px(16.0)),
+                        border: UiRect::all(Val::Px(2.0)),
+                        ..default()
+                    },
+                    BackgroundColor(INK),
+                    BorderColor::from(GOLD_DARK),
+                    children![(
+                        Text::new("Begin Adventure (Easy Mode)"),
+                        TextFont {
+                            font: game_assets.font_cormorant_unicase_semibold.clone(),
+                            font_size: 28.0,
+                            ..default()
+                        },
+                        TextColor(PARCHMENT),
+                    )],
+                ));
+
                 // Tutorial button
                 menu.spawn((
                     TutorialButton,
@@ -125,9 +156,24 @@ fn despawn_main_menu(mut commands: Commands, roots: Query<Entity, With<MainMenuR
 fn handle_start_button(
     interactions: Query<&Interaction, (Changed<Interaction>, With<StartButton>)>,
     mut next_state: ResMut<NextState<GameState>>,
+    mut easy_mode: ResMut<EasyMode>,
 ) {
     for interaction in &interactions {
         if *interaction == Interaction::Pressed {
+            easy_mode.active = false;
+            next_state.set(GameState::Adventure);
+        }
+    }
+}
+
+fn handle_easy_mode_button(
+    interactions: Query<&Interaction, (Changed<Interaction>, With<EasyModeButton>)>,
+    mut next_state: ResMut<NextState<GameState>>,
+    mut easy_mode: ResMut<EasyMode>,
+) {
+    for interaction in &interactions {
+        if *interaction == Interaction::Pressed {
+            easy_mode.active = true;
             next_state.set(GameState::Adventure);
         }
     }

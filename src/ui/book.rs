@@ -406,8 +406,8 @@ fn sync_book_panel(
 
                 row.spawn((
                     Node {
-                        width: Val::Px(12.0),
-                        height: Val::Px(12.0),
+                        width: Val::Px(24.0),
+                        height: Val::Px(24.0),
                         ..default()
                     },
                     ImageNode::from_atlas_image(

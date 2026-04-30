@@ -7,14 +7,12 @@ use std::collections::{HashMap, HashSet};
 use crate::GameAssets;
 use crate::futhark::{index_to_letter, letter_to_index};
 use crate::ui::hud_root::LeftColumn;
-use crate::ui::palette::{GOLD_DARK, GOLD_LIGHT, PARCHMENT_DARK};
+use crate::ui::palette::{GOLD_DARK, GOLD_LIGHT};
 
-#[allow(dead_code)]
-const KEYBOARD_ROW_OFFSETS: [f32; 3] = [0.0, 96.0, 128.0];
 /// Per-row left padding as a percentage of the keyboard panel width.
 /// Derived from the legacy pixel offsets above against a ~640 px reference panel
 /// (top row: tab key + 10 keys + gaps = 80 + 8 + 10*48 + 9*8).
-const KEYBOARD_ROW_PERCENT_OFFSETS: [f32; 3] = [0.0, 15.0, 20.0];
+const KEYBOARD_ROW_PERCENT_OFFSETS: [f32; 3] = [0.0, 7.0, 14.0];
 const KEYBOARD_TOP_ROW: [usize; 10] = [12, 7, 18, 4, 16, 2, 1, 10, 23, 13];
 const KEYBOARD_MIDDLE_ROW: [usize; 9] = [3, 15, 22, 0, 6, 8, 11, 5, 20];
 const KEYBOARD_BOTTOM_ROW: [usize; 7] = [14, 24, 21, usize::MAX, 17, 9, 19];
@@ -29,6 +27,9 @@ pub struct FutharkKeyboard;
 
 #[derive(Component)]
 pub struct KeyboardPanel;
+
+#[derive(Component)]
+pub struct ZoomedKeyboardPanel;
 
 #[derive(Component)]
 pub struct FutharkKeyboardButton;
@@ -78,13 +79,6 @@ pub struct FutharkKeyLetterVisual;
 
 #[derive(Component)]
 pub struct FutharkTabActionVisual;
-
-#[derive(Resource, Default, Clone, Copy, PartialEq, Eq)]
-pub enum FutharkKeyboardLegendMode {
-    #[default]
-    Runes,
-    Letters,
-}
 
 #[derive(Resource, Clone, Copy)]
 pub struct FutharkKeyboardAnimationSpeed {
@@ -174,7 +168,6 @@ impl FutharkKeyboardAliases {
 }
 
 pub fn configure_futhark_keyboard(app: &mut App) {
-    app.init_resource::<FutharkKeyboardLegendMode>();
     app.init_resource::<FutharkKeyboardAnimationSpeed>();
     app.init_resource::<FutharkKeyboardAliases>();
     app.init_resource::<EliminatedFutharkKeys>();
@@ -295,6 +288,114 @@ const ABSOLUTE_METRICS: KeyMetrics = KeyMetrics {
     header_aside_font_size: 12.0,
 };
 
+const ZOOMED_ABSOLUTE_METRICS: KeyMetrics = KeyMetrics {
+    key_width: Val::Px(96.0),
+    key_height: Val::Px(96.0),
+    key_aspect_ratio: None,
+    wide_key_width: Val::Px(160.0),
+    wide_key_height: Val::Px(96.0),
+    wide_key_aspect_ratio: None,
+    column_gap: Val::Px(16.0),
+    row_gap: Val::Px(20.0),
+    rune_size: Val::Px(64.0),
+    rune_aspect_ratio: None,
+    letter_font_size: 48.0,
+    panel_padding: UiRect::all(Val::Px(20.0)),
+    panel_row_gap: Val::Px(16.0),
+    header_margin_bottom: Val::Px(12.0),
+    header_title_font_size: 32.0,
+    header_aside_font_size: 24.0,
+};
+
+fn spawn_keyboard_children(
+    panel: &mut ChildSpawnerCommands,
+    game_assets: &GameAssets,
+    metrics: &KeyMetrics,
+    rows: &[Vec<usize>; 3],
+) {
+    let header_title_font = game_assets.font_cormorant_unicase_semibold.clone();
+
+    panel
+        .spawn(Node {
+            width: Val::Percent(100.0),
+            flex_direction: FlexDirection::Row,
+            justify_content: JustifyContent::SpaceBetween,
+            align_items: AlignItems::Baseline,
+            margin: UiRect::bottom(metrics.header_margin_bottom),
+            ..default()
+        })
+        .with_children(|header| {
+            header.spawn((
+                Text::new("Rune Keyboard"),
+                TextFont {
+                    font: header_title_font.clone(),
+                    font_size: metrics.header_title_font_size,
+                    ..default()
+                },
+                TextColor(GOLD_LIGHT),
+            ));
+            header.spawn((
+                Text::new("Tab to zoom"),
+                TextFont {
+                    font: header_title_font,
+                    font_size: metrics.header_title_font_size,
+                    ..default()
+                },
+                TextColor(GOLD_LIGHT),
+            ));
+        });
+
+    panel
+        .spawn((
+            FutharkKeyboard,
+            Node {
+                width: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                row_gap: metrics.row_gap,
+                ..default()
+            },
+        ))
+        .with_children(|parent| {
+            for (row_index, row) in rows.iter().enumerate() {
+                parent
+                    .spawn(Node {
+                        width: Val::Percent(100.0),
+                        padding: UiRect::left(Val::Percent(
+                            KEYBOARD_ROW_PERCENT_OFFSETS[row_index],
+                        )),
+                        column_gap: metrics.column_gap,
+                        ..default()
+                    })
+                    .with_children(|row_parent| {
+                        for &index in row {
+                            if index == usize::MAX {
+                                row_parent.spawn(Node {
+                                    width: metrics.key_width,
+                                    height: metrics.key_height,
+                                    aspect_ratio: metrics.key_aspect_ratio,
+                                    ..default()
+                                });
+                                continue;
+                            }
+
+                            spawn_letter_key(row_parent, game_assets, metrics, index);
+                        }
+
+                        if row_index == 2 {
+                            spawn_action_key(
+                                row_parent,
+                                game_assets,
+                                metrics,
+                                SPRITE_BACKSPACE_ACTION,
+                                FutharkKeyboardCommandType::Backspace,
+                                false,
+                            );
+                        }
+                    });
+            }
+        });
+}
+
 pub fn spawn_futhark_keyboard(
     mut commands: Commands,
     game_assets: Res<GameAssets>,
@@ -347,81 +448,70 @@ pub fn spawn_futhark_keyboard(
         panel.insert(ChildOf(parent));
     }
 
-    let header_title_font = game_assets.font_cormorant_unicase_semibold.clone();
-    let header_aside_font = game_assets.font_im_fell_sc.clone();
+    panel.with_children(|panel| {
+        spawn_keyboard_children(panel, &game_assets, &metrics, &rows);
+    });
+}
+
+pub fn spawn_zoomed_futhark_keyboard(
+    mut commands: Commands,
+    game_assets: Res<GameAssets>,
+    battle_hud_root: Query<Entity, With<crate::ui::hud_root::BattleHudRoot>>,
+) {
+    let Some(host) = battle_hud_root.single().ok() else {
+        return;
+    };
+
+    let metrics = ZOOMED_ABSOLUTE_METRICS;
+    let rows = keyboard_rows_by_index();
+
+    let mut panel = commands.spawn((
+        KeyboardPanel,
+        ZoomedKeyboardPanel,
+        Node {
+            position_type: PositionType::Absolute,
+            left: Val::Px(0.0),
+            bottom: Val::Px(0.0),
+            flex_direction: FlexDirection::Column,
+            row_gap: metrics.panel_row_gap,
+            border: UiRect::all(Val::Px(2.0)),
+            padding: metrics.panel_padding,
+            ..default()
+        },
+        BackgroundColor(Color::srgba(0.07, 0.05, 0.02, 0.92)),
+        BorderColor {
+            top: GOLD_DARK,
+            right: GOLD_DARK,
+            bottom: GOLD_DARK,
+            left: GOLD_DARK,
+        },
+        ZIndex(100),
+        Visibility::Hidden,
+        ChildOf(host),
+    ));
 
     panel.with_children(|panel| {
-        panel
-            .spawn(Node {
-                width: Val::Percent(100.0),
-                flex_direction: FlexDirection::Row,
-                justify_content: JustifyContent::SpaceBetween,
-                align_items: AlignItems::Baseline,
-                margin: UiRect::bottom(metrics.header_margin_bottom),
-                ..default()
-            })
-            .with_children(|header| {
-                header.spawn((
-                    Text::new("Rune Keyboard"),
-                    TextFont {
-                        font: header_title_font,
-                        font_size: metrics.header_title_font_size,
-                        ..default()
-                    },
-                    TextColor(GOLD_LIGHT),
-                ));
-            });
-
-        panel
-            .spawn((
-                FutharkKeyboard,
-                Node {
-                    width: Val::Percent(100.0),
-                    flex_direction: FlexDirection::Column,
-                    row_gap: metrics.row_gap,
-                    ..default()
-                },
-            ))
-            .with_children(|parent| {
-                for (row_index, row) in rows.iter().enumerate() {
-                    parent
-                        .spawn(Node {
-                            width: Val::Percent(100.0),
-                            padding: UiRect::left(Val::Percent(
-                                KEYBOARD_ROW_PERCENT_OFFSETS[row_index],
-                            )),
-                            column_gap: metrics.column_gap,
-                            ..default()
-                        })
-                        .with_children(|row_parent| {
-                            for &index in row {
-                                if index == usize::MAX {
-                                    row_parent.spawn(Node {
-                                        width: metrics.key_width,
-                                        height: metrics.key_height,
-                                        aspect_ratio: metrics.key_aspect_ratio,
-                                        ..default()
-                                    });
-                                    continue;
-                                }
-
-                                spawn_letter_key(row_parent, &game_assets, &metrics, index);
-                            }
-
-                            if row_index == 2 {
-                                spawn_action_key(
-                                    row_parent,
-                                    &game_assets,
-                                    &metrics,
-                                    SPRITE_BACKSPACE_ACTION,
-                                    FutharkKeyboardCommandType::Backspace,
-                                    false,
-                                );
-                            }
-                        });
-                }
-            });
+        spawn_keyboard_children(panel, &game_assets, &metrics, &rows);
     });
+}
+
+pub fn sync_keyboard_zoom(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut panels: Query<(&mut Visibility, Option<&ZoomedKeyboardPanel>), With<KeyboardPanel>>,
+) {
+    let tab_held = keyboard.pressed(KeyCode::Tab);
+
+    for (mut vis, zoomed) in &mut panels {
+        let is_zoomed = zoomed.is_some();
+        let new_vis = if tab_held == is_zoomed {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        };
+        if *vis != new_vis {
+            *vis = new_vis;
+        }
+    }
 }
 
 fn spawn_action_key(
@@ -699,55 +789,6 @@ pub fn animate_futhark_keyboard_colors(
 
     for mut image in &mut rune_images {
         image.color = color;
-    }
-}
-
-pub fn toggle_futhark_keyboard_legend_mode(
-    keyboard: Res<ButtonInput<KeyCode>>,
-    mut commands: MessageReader<FutharkKeyboardCommand>,
-    mut mode: ResMut<FutharkKeyboardLegendMode>,
-) {
-    let tab_pressed = keyboard.just_pressed(KeyCode::Tab)
-        || commands
-            .read()
-            .any(|command| command.0 == FutharkKeyboardCommandType::ToggleLegendMode);
-
-    if tab_pressed {
-        *mode = match *mode {
-            FutharkKeyboardLegendMode::Runes => FutharkKeyboardLegendMode::Letters,
-            FutharkKeyboardLegendMode::Letters => FutharkKeyboardLegendMode::Runes,
-        };
-    }
-}
-
-pub fn sync_futhark_keyboard_labels(
-    mode: Res<FutharkKeyboardLegendMode>,
-    mut runes: Query<&mut Node, (With<FutharkKeyRuneVisual>, Without<FutharkKeyLetterVisual>)>,
-    mut letters: Query<
-        (&FutharkKeyLabel, &mut Text, &mut TextFont, &mut Node),
-        (With<FutharkKeyLetterVisual>, Without<FutharkKeyRuneVisual>),
-    >,
-) {
-    if !mode.is_changed() {
-        return;
-    }
-
-    let (rune_display, letter_display) = match *mode {
-        FutharkKeyboardLegendMode::Runes => (Display::Flex, Display::None),
-        FutharkKeyboardLegendMode::Letters => (Display::None, Display::Flex),
-    };
-
-    for mut node in &mut runes {
-        node.display = rune_display;
-    }
-
-    for (label, mut text, mut text_font, mut node) in &mut letters {
-        if let Some(letter) = index_to_letter(label.index) {
-            let (legend, font_size) = keyboard_label_for_letter(letter);
-            *text = Text::new(legend);
-            text_font.font_size = font_size;
-        }
-        node.display = letter_display;
     }
 }
 

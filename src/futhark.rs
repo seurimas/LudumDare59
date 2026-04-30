@@ -9,12 +9,12 @@ pub use crate::ui::keyboard::{
     FutharkKeyButton, FutharkKeyFade, FutharkKeyLabel, FutharkKeyLetterVisual,
     FutharkKeyRuneVisual, FutharkKeyboard, FutharkKeyboardAliases, FutharkKeyboardAnimationSpeed,
     FutharkKeyboardButton, FutharkKeyboardCommand, FutharkKeyboardCommandType,
-    FutharkKeyboardLegendMode, FutharkTabActionVisual, KeyboardPanel, SPRITE_RUNE_OFFSET,
-    TypedFutharkInput, animate_futhark_keyboard_colors, configure_futhark_keyboard,
+    FutharkTabActionVisual, KeyboardPanel, SPRITE_RUNE_OFFSET, TypedFutharkInput,
+    ZoomedKeyboardPanel, animate_futhark_keyboard_colors, configure_futhark_keyboard,
     emit_futhark_keyboard_command_from_clicks, emit_typed_futhark_input_from_keyboard,
     emit_typed_futhark_input_from_keyboard_clicks, keyboard_rows_by_index,
-    last_typed_futhark_character, spawn_futhark_keyboard, sync_eliminated_futhark_keys,
-    sync_futhark_key_hover, sync_futhark_keyboard_labels, toggle_futhark_keyboard_legend_mode,
+    last_typed_futhark_character, spawn_futhark_keyboard, spawn_zoomed_futhark_keyboard,
+    sync_eliminated_futhark_keys, sync_futhark_key_hover, sync_keyboard_zoom,
 };
 
 pub const LETTERS: [char; 25] = [
