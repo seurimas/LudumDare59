@@ -158,6 +158,9 @@ pub fn configure_app(app: &mut App) {
             .chain()
             .run_if(in_state(GameState::Adventure)),
     );
+    #[cfg(target_arch = "wasm32")]
+    app.add_systems(Update, listen_for_fullscreen);
+
     app.add_systems(
         Update,
         rune_words::rune_slots::tick_word_audio_queue.run_if(in_state(GameState::Adventure)),
@@ -187,4 +190,15 @@ pub fn wasm_main() {
     rune_words::battle::configure_battle(&mut app);
     configure_loading(&mut app);
     app.run();
+}
+
+#[cfg(target_arch = "wasm32")]
+fn listen_for_fullscreen(mut key_input: Res<ButtonInput<KeyCode>>) {
+    if key_input.just_pressed(KeyCode::F11) {
+        web_sys::window()
+            .and_then(|win| win.document())
+            .and_then(|doc| doc.document_element())
+            .and_then(|elem| elem.request_fullscreen().ok());
+        web_sys::console::log_1(&"Toggled fullscreen".into());
+    }
 }
