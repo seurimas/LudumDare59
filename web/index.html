@@ -5,15 +5,21 @@
 <title>Runic Ascendancy</title>
 <style>
     html, body {
-        margin: 0;
         height: 100%;
+        margin: 0;
         background: #1a1a2e;
     }
-    #bevy {
-        display: block;
+    .game-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
         width: 100%;
         height: 100%;
+    }
+    #bevy {
         background-color: #000;
+        width: 1280px;
+        height: 720px;
     }
 </style>
 </head>
@@ -34,7 +40,9 @@
         events.forEach(e => document.addEventListener(e, handler));
     })();
     </script>
-    <canvas id="bevy">JavaScript and canvas support required</canvas>
+    <div class="game-container">
+        <canvas id="bevy">JavaScript and canvas support required</canvas>
+    </div>
     <script type="module">
         import init from './LudumDare59.js';
         init('./LudumDare59_bg.wasm');

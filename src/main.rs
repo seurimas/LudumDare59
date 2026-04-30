@@ -12,7 +12,6 @@ fn main() {
         primary_window: Some(Window {
             title: "Runic Ascendancy".into(),
             resolution: bevy::window::WindowResolution::new(1280_u32, 960_u32),
-            fit_canvas_to_parent: true,
             ..default()
         }),
         ..default()
