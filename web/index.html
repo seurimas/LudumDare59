@@ -39,6 +39,19 @@
         });
         events.forEach(e => document.addEventListener(e, handler));
     })();
+
+    document.addEventListener('keypress', (e) => {
+        if (e.code === 'F11') {
+             e.preventDefault();
+        } else {
+            return;
+        }
+        if (document.requestFullscreen) {
+            document.requestFullscreen();
+        } else if (document.webkitRequestFullscreen) { /* Safari support */
+            document.webkitRequestFullscreen();
+        }
+    });
     </script>
     <div class="game-container">
         <canvas id="bevy">JavaScript and canvas support required</canvas>
