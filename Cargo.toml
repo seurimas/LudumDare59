@@ -18,48 +18,8 @@ wasm-bindgen = "0.2"
 web-sys = { version = "0.3", features = ["Window", "console"] }
 
 [[bin]]
-name = "uat_shows_window"
-path = "tests/acceptance/shows_window.rs"
-
-[[bin]]
-name = "uat_shows_futhark_rune"
-path = "tests/acceptance/shows_futhark_rune.rs"
-
-[[bin]]
-name = "uat_shows_loading_rune_reveal"
-path = "tests/acceptance/shows_loading_rune_reveal.rs"
-
-[[bin]]
-name = "uat_shows_typed_futhark_rune"
-path = "tests/acceptance/shows_typed_futhark_rune.rs"
-
-[[bin]]
-name = "uat_shows_rune_slots"
-path = "tests/acceptance/shows_rune_slots.rs"
-
-[[bin]]
-name = "uat_shows_rune_word_navigation"
-path = "tests/acceptance/shows_rune_word_navigation.rs"
-
-[[bin]]
-name = "uat_shows_binding_battle_state"
-path = "tests/acceptance/shows_binding_battle_state.rs"
-
-[[bin]]
-name = "uat_shows_acting_battle_state"
-path = "tests/acceptance/shows_acting_battle_state.rs"
-
-[[bin]]
-name = "uat_battle_stages"
-path = "tests/acceptance/uat_battle_stages.rs"
-
-[[bin]]
-name = "uat_battle_against_npc"
-path = "tests/acceptance/uat_battle_against_npc.rs"
-
-[[bin]]
-name = "uat_shows_spell_selection"
-path = "tests/acceptance/shows_spell_selection.rs"
+name = "uat"
+path = "tests/acceptance/uat.rs"
 
 [[bin]]
 name = "futhark_it"

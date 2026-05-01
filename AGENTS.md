@@ -13,11 +13,11 @@ When you are asked to do something, it should fall under a certain umbrella. Bas
 
 ## Running UAT binaries
 
-Always run UAT binaries with `cargo run --bin <name>` from the project root. This ensures the `assets/` directory is found relative to the working directory. Never launch the compiled `.exe` directly (e.g. via `Start-Process` or by path), as it will not find assets.
+Always run UAT binaries with `cargo run --bin uat -- <test_name> [args...]` from the project root. This ensures the `assets/` directory is found relative to the working directory. Never launch the compiled `.exe` directly (e.g. via `Start-Process` or by path), as it will not find assets.
 
 Example:
 ```
-cargo run --bin uat_shows_loading_rune_reveal
+cargo run --bin uat -- shows_loading_rune_reveal
 ```
 
 If the UAT exits with status 0, then that means I have approved the state of the UAT! Good job! If not, ask about what can be done to improve things.
@@ -30,7 +30,7 @@ Do `git log -3` before beginning work. This will highlight the most recent work 
 
 ## Post-work checklist
 
-After completing ANY non-visual work, always run `cargo test`. For visual work, you must identify any new or changed UAT tests. Run them with `cargo run --bin <name>` and expect a zero output. YOU must run the UAT when it is appropriate to do so. If you get a non-zero output, use AskUserQuestion or similar tool to ask what went wrong and iterate on their feedback.
+After completing ANY non-visual work, always run `cargo test`. For visual work, you must identify any new or changed UAT tests. Run them with `cargo run --bin uat -- <test_name>` and expect a zero output. YOU must run the UAT when it is appropriate to do so. If you get a non-zero output, use AskUserQuestion or similar tool to ask what went wrong and iterate on their feedback.
 
 Verify that your changes have not introduced new problems. When that is complete, go ahead and do all of the following:
 

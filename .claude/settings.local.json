@@ -9,7 +9,10 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(echo \"Exit code: $?\")",
-      "Bash(cargo check *)"
+      "Bash(cargo check *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\mtgat\\\\git\\\\LudumDare59\" -Recurse -Filter \"Cargo.toml\")",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\mtgat\\\\git\\\\LudumDare59\" -Recurse -Directory | Where-Object { $_.Name -eq \"bin\" } | Select-Object -ExpandProperty FullName)"
     ]
   }
 }
