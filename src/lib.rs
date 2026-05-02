@@ -1,6 +1,7 @@
-use bevy::prelude::*;
+use bevy::{input::common_conditions::input_toggle_active, prelude::*};
 use bevy_aspect_ratio_mask::{AspectRatioPlugin, Resolution};
 use bevy_asset_loader::prelude::*;
+use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
 use wasm_bindgen::prelude::*;
 
 use crate::health::PlayerCombatState;
@@ -121,7 +122,9 @@ pub fn configure_app(app: &mut App) {
             height: 720.0,
         },
         ..default()
-    });
+    })
+    .add_plugins(EguiPlugin::default())
+    .add_plugins(WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::F7)));
     futhark::configure_futhark_keyboard(app);
     rune_words::rune_slots::configure_rune_slots(app);
     ui::configure_ui(app);

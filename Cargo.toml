@@ -8,6 +8,7 @@ default-run = "LudumDare59"
 bevy = { version = "0.18.1", features = ["debug"] }
 bevy_asset_loader = { version = "0.26", features = ["2d"] }
 bevy_aspect_ratio_mask = "0.4"
+bevy-inspector-egui = "0.36"
 rand = "0.10"
 getrandom = { version = "0.4", features = ["wasm_js"] }
 rodio = "0.20"
